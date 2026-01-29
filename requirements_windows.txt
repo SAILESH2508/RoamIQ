@@ -1,0 +1,54 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-CORS==4.0.0
+Flask-JWT-Extended==4.5.3
+openai==1.3.5
+spacy==3.7.2
+requests==2.31.0
+python-dotenv==1.0.0
+bcrypt==4.0.1
+pandas==2.1.3
+numpy==1.25.2
+scikit-learn==1.3.2
+textblob==0.17.1
+geopy==2.4.0
+
+# Enhanced dependencies for production (Windows compatible)
+Flask-SocketIO==5.3.6
+flasgger==0.9.7.1
+redis==5.0.1
+celery==5.3.4
+gunicorn==21.2.0
+psycopg2-binary==2.9.9
+alembic==1.13.1
+marshmallow==3.20.1
+webargs==8.3.0
+sentry-sdk[flask]==1.38.0
+prometheus-client==0.19.0
+httpx==0.25.2
+
+# Testing dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-flask==1.3.0
+
+# Development dependencies
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# Basic AI dependencies (without heavy ML libraries for now)
+anthropic==0.25.0
+google-genai
+cohere==4.57
+
+# Async & Performance (Windows compatible)
+aiohttp==3.9.1
+asyncio==3.4.3
+
+# Additional Utilities
+python-magic-bin==0.4.14
+filetype==1.2.0
+python-multipart==0.0.6
