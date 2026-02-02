@@ -39,7 +39,7 @@ const GenAIHub = () => {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    const fetchConversations = async () => {
+    const fetchConversations = React.useCallback(async () => {
         try {
             const res = await axios.get('/api/ai/chat/conversations', {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -49,9 +49,9 @@ const GenAIHub = () => {
             console.error("Failed to fetch conversations", err);
             toast.error("Failed to fetch chat history. Check connection.");
         }
-    };
+    }, []);
 
-    const loadConversation = async (id) => {
+    const loadConversation = React.useCallback(async (id) => {
         setIsLoading(true);
         try {
             const res = await axios.get(`/api/ai/chat/history/${id}`, {
@@ -73,7 +73,7 @@ const GenAIHub = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
 
     // Initial Load
     useEffect(() => {
@@ -92,13 +92,13 @@ const GenAIHub = () => {
             fetchConversations();
             setIsInitialLoad(false);
         }
-    }, [isInitialLoad]);
+    }, [isInitialLoad, loadConversation, fetchConversations]);
 
     useEffect(() => {
         localStorage.setItem('roamiq_active_conv_id', conversationId);
     }, [conversationId]);
 
-    const startNewChat = () => {
+    const startNewChat = React.useCallback(() => {
         setConversationId(uuidv4());
         setMessages([{
             id: 'welcome-' + Date.now(),
@@ -107,14 +107,14 @@ const GenAIHub = () => {
             timestamp: new Date()
         }]);
         setActiveSidebar('chat');
-    };
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     // --- Message Handling ---
-    const addMessage = (content, type = 'user', extras = {}) => {
+    const addMessage = React.useCallback((content, type = 'user', extras = {}) => {
         setMessages(prev => [...prev, {
             id: Date.now(),
             type,
@@ -122,9 +122,10 @@ const GenAIHub = () => {
             timestamp: new Date(),
             ...extras
         }]);
-    };
+    }, []);
 
-    const handleSendMessage = async () => {
+
+    const handleSendMessage = React.useCallback(async () => {
         if (!inputMessage.trim() && !selectedFile) return;
 
         const currentMsg = inputMessage;
@@ -183,7 +184,7 @@ const GenAIHub = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [inputMessage, selectedFile, conversationId, addMessage]);
 
     // 1. File Handling (Universal)
     const handleFileSelect = (e) => {
@@ -201,7 +202,7 @@ const GenAIHub = () => {
     };
 
     // 2. Voice Handling
-    const toggleRecording = async () => {
+    const toggleRecording = React.useCallback(async () => {
         if (isRecording) {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
@@ -251,10 +252,10 @@ const GenAIHub = () => {
                 toast.error("Microphone access denied");
             }
         }
-    };
+    }, [isRecording, conversationId, addMessage]);
 
     // 3. Packing List
-    const handlePackingSubmit = async () => {
+    const handlePackingSubmit = React.useCallback(async () => {
         setChecklistPrompt({ ...checkListPrompt, show: false });
         addMessage(`Generate packing list for ${checkListPrompt.dest} (${checkListPrompt.days} days)`, 'user');
         setIsLoading(true);
@@ -270,7 +271,7 @@ const GenAIHub = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [checkListPrompt, addMessage]);
 
     // --- Renders ---
 
@@ -289,10 +290,10 @@ const GenAIHub = () => {
     );
 
     return (
-        <div className="gen-ai-hub d-flex mx-auto" style={{ height: '85vh', maxWidth: '1300px', background: '#fffaf5', borderRadius: '20px', overflow: 'hidden', marginTop: '20px' }}>
+        <div className="gen-ai-hub d-flex m-auto" style={{ height: 'calc(100vh - 180px)', maxWidth: '1100px', width: '98%', background: '#fffaf5', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.1)' }}>
 
             {/* Sidebar / Feature Bar */}
-            <div className="d-flex flex-column bg-white border-end p-3" style={{ width: '280px' }}>
+            <div className="d-flex flex-column bg-white border-end p-3" style={{ width: '240px' }}>
                 <div className="mb-4">
                     <h5 className="fw-bold gradients-text mb-1">RoamIQ Assistant</h5>
                     <LocationTracker />
@@ -465,8 +466,8 @@ const GenAIHub = () => {
                                         value={inputMessage}
                                         onChange={(e) => setInputMessage(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                        className="rounded-pill border-0 bg-light px-4 py-3 shadow-inner"
-                                        style={{ fontSize: '0.95rem' }}
+                                        className="rounded-pill border border-2 bg-white px-4 py-3 shadow-sm ai-input-field"
+                                        style={{ fontSize: '1rem', borderColor: '#fbbf24' }}
                                         disabled={isRecording}
                                     />
 

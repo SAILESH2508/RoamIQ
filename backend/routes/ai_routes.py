@@ -104,11 +104,12 @@ def get_conversations():
     """List summary of all conversations for the current user."""
     try:
         from backend.models.chat_message import ChatMessage
+        from backend.extensions import db
         from sqlalchemy import func
         user_identity = get_jwt_identity()
         user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
         
-        print(f"DEBUG: Fetching conversations for user_id: {user_id} (identity: {user_identity})")
+        logger.debug(f"Fetching conversations for user_id: {user_id}")
         
         # Robust query: get latest message per conversation using max(id)
         # Re-restoring filter now that debugging is complete
@@ -121,9 +122,7 @@ def get_conversations():
             )
         ).order_by(ChatMessage.timestamp.desc()).all()
         
-        print(f"DEBUG: SQLite query returned {len(conversations)} conversations for user {user_id}")
-        if len(conversations) > 0:
-            print(f"DEBUG: Sample conv_id: {conversations[0].conversation_id}")
+        logger.debug(f"SQLite query returned {len(conversations)} conversations for user {user_id}")
         
         results = []
         for conv in conversations:

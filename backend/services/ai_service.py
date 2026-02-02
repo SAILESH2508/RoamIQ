@@ -3,6 +3,7 @@ import json
 from typing import Dict, List, Optional, Any
 from backend.services.ai.llm_provider import llm_provider
 from backend.services.ai.rag_service import rag_service
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

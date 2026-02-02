@@ -4,6 +4,9 @@ from backend.models.user import User, db
 from backend.models.preference import UserPreference
 import sys
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -15,22 +18,22 @@ def before_auth_request():
 def register():
     try:
         data = request.get_json()
-        print(f"Registration attempt for user: {data.get('username')}")
+        logger.debug(f"Registration attempt for user: {data.get('username')}")
         
         # Validate required fields
         required_fields = ['username', 'email', 'password']
         for field in required_fields:
             if not data.get(field):
-                print(f"Registration failed: {field} is required")
+                logger.warning(f"Registration failed: {field} is required")
                 return jsonify({'error': f'{field} is required'}), 400
         
         # Check if user already exists
         if User.query.filter_by(username=data['username']).first():
-            print(f"Registration failed: Username '{data['username']}' already exists")
+            logger.warning(f"Registration failed: Username '{data['username']}' already exists")
             return jsonify({'error': 'Username already exists'}), 400
         
         if User.query.filter_by(email=data['email']).first():
-            print(f"Registration failed: Email '{data['email']}' already exists")
+            logger.warning(f"Registration failed: Email '{data['email']}' already exists")
             return jsonify({'error': 'Email already exists'}), 400
         
         # Create new user
@@ -47,21 +50,21 @@ def register():
             try:
                 user.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()
             except ValueError:
-                print(f"Registration failed: Invalid date format '{data['date_of_birth']}'")
+                logger.warning(f"Registration failed: Invalid date format '{data['date_of_birth']}'")
                 return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
         
         db.session.add(user)
         db.session.commit()
-        print(f"User '{user.username}' created successfully with ID: {user.id}")
+        logger.info(f"User '{user.username}' created successfully with ID: {user.id}")
         
         # Create default preferences
         try:
             preferences = UserPreference(user_id=user.id)
             db.session.add(preferences)
             db.session.commit()
-            print(f"Default preferences created for user ID: {user.id}")
+            logger.debug(f"Default preferences created for user ID: {user.id}")
         except Exception as pref_e:
-            print(f"Warning: Failed to create preferences for user {user.id}: {pref_e}")
+            logger.warning(f"Failed to create preferences for user {user.id}: {pref_e}")
             # Continue even if preferences fail
         
         # Generate access token
@@ -76,7 +79,7 @@ def register():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Registration error: {str(e)}\n{error_trace}", file=sys.stderr)
+        logger.error(f"Registration error: {str(e)}\n{error_trace}")
         db.session.rollback()
         return jsonify({
             'error': str(e),
@@ -87,10 +90,10 @@ def register():
 def login():
     try:
         data = request.get_json()
-        print(f"Login attempt for user/email: {data.get('username')}")
+        logger.debug(f"Login attempt for user/email: {data.get('username')}")
         
         if not data.get('username') or not data.get('password'):
-            print("Login failed: Username and password are required")
+            logger.warning("Login failed: Username and password are required")
             return jsonify({'error': 'Username and password are required'}), 400
         
         # Find user by username or email
@@ -99,16 +102,16 @@ def login():
         ).first()
         
         if not user:
-            print(f"Login failed: User '{data['username']}' not found")
+            logger.warning(f"Login failed: User '{data['username']}' not found")
             return jsonify({'error': 'Invalid credentials'}), 401
             
         if not user.check_password(data['password']):
-            print(f"Login failed: Incorrect password for user '{user.username}'")
+            logger.warning(f"Login failed: Incorrect password for user '{user.username}'")
             return jsonify({'error': 'Invalid credentials'}), 401
         
         # Generate access token
         access_token = create_access_token(identity=str(user.id))
-        print(f"Login successful for user '{user.username}' (ID: {user.id})")
+        logger.info(f"Login successful for user '{user.username}' (ID: {user.id})")
         
         return jsonify({
             'message': 'Login successful',
@@ -119,7 +122,7 @@ def login():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Login error: {str(e)}\n{error_trace}", file=sys.stderr)
+        logger.error(f"Login error: {str(e)}\n{error_trace}")
         return jsonify({
             'error': str(e),
             'traceback': error_trace if request.args.get('debug') else None
@@ -138,9 +141,7 @@ def get_profile():
         return jsonify({'user': user.to_dict()}), 200
         
     except Exception as e:
-        import traceback
-        print(f"Profile GET error: {str(e)}")
-        traceback.print_exc()
+        logger.error(f"Profile GET error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/profile', methods=['PUT'])
@@ -175,8 +176,6 @@ def update_profile():
         }), 200
         
     except Exception as e:
-        import traceback
-        print(f"Profile PUT error: {str(e)}")
-        traceback.print_exc()
+        logger.error(f"Profile PUT error: {str(e)}")
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

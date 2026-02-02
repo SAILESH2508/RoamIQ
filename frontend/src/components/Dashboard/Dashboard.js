@@ -8,6 +8,8 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 
 import ExpenseTracker from '../Travel/ExpenseTracker';
 import LocationTracker from '../Travel/LocationTracker';
+import MapWidget from './MapWidget';
+import { motion } from 'framer-motion';
 
 
 const Dashboard = () => {
@@ -21,13 +23,10 @@ const Dashboard = () => {
     totalBudget: 0,
     completedTrips: 0
   });
+  const [userLocation, setUserLocation] = useState(null);
 
 
-  useEffect(() => {
-    fetchTrips();
-  }, []);
-
-  const fetchTrips = async () => {
+  const fetchTrips = React.useCallback(async () => {
     try {
       const response = await axios.get('/api/travel/trips');
       const tripsData = response.data.trips;
@@ -52,7 +51,15 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTrips();
+    // Initialize location from user profile if available
+    if (user?.last_location) {
+      setUserLocation(user.last_location);
+    }
+  }, [fetchTrips, user]);
 
   const getStatusBadge = (status) => {
     const statusColors = {
@@ -69,22 +76,37 @@ const Dashboard = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const handleLocationUpdate = React.useCallback((loc) => {
+    setUserLocation(loc);
+  }, []);
+
   return (
-    <Container className="py-5">
+    <Container className="pb-5 pt-0 mt-0 page-container">
       {/* Welcome Section */}
       <Row className="mb-5">
         <Col>
-          <div className="glass-panel p-5 text-center position-relative overflow-hidden">
-            <div className="position-absolute top-0 start-0 w-100 h-100 bg-gradient-soft opacity-50" style={{ zIndex: -1 }}></div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="glass-panel p-5 text-center position-relative overflow-hidden shadow-2xl"
+            style={{
+              backgroundImage: 'linear-gradient(rgba(255, 247, 237, 0.8), rgba(255, 247, 237, 0.8)), url(/assets/hero-bg.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              borderRadius: '30px',
+              border: '1px solid rgba(255,255,255,0.4)'
+            }}
+          >
             <h1 className="display-4 fw-bold mb-3 gradients-text">
               Welcome back, {user?.full_name || user?.username}!
             </h1>
-            <p className="lead text-dark opacity-75 mb-4 mx-auto" style={{ maxWidth: '700px' }}>
+            <p className="lead text-dark fw-semibold mb-4 mx-auto" style={{ maxWidth: '700px' }}>
               Your next great adventure awaits. Use our AI-powered tools to plan, discover, and organize your perfect trip.
             </p>
             <div className="d-flex justify-content-center mb-4">
-              <div className="glass-panel py-2 px-3 rounded-pill shadow-sm border-white border-opacity-25">
-                <LocationTracker />
+              <div className="glass-panel py-2 px-3 rounded-pill shadow-sm bg-white bg-opacity-50 border-white">
+                <LocationTracker onUpdate={handleLocationUpdate} />
               </div>
             </div>
             <div className="d-flex justify-content-center gap-3 flex-wrap">
@@ -101,7 +123,7 @@ const Dashboard = () => {
                 </Button>
               </Link>
             </div>
-          </div>
+          </motion.div>
         </Col>
       </Row>
 
@@ -153,6 +175,26 @@ const Dashboard = () => {
         </Col>
       </Row>
 
+      {/* Map Section */}
+      <Row className="mb-5">
+        <Col>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="glass-card border-0 overflow-hidden shadow-xl" style={{ borderRadius: '30px' }}>
+              <Card.Header className="bg-transparent border-0 p-4 pb-0">
+                <h4 className="fw-bold mb-0">Your Global Map</h4>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <MapWidget trips={trips} userLocation={userLocation} />
+              </Card.Body>
+            </Card>
+          </motion.div>
+        </Col>
+      </Row>
+
 
 
       {/* Recent Trips */}
@@ -190,51 +232,59 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <Row>
-                  {trips.slice(0, 6).map((trip) => (
+                  {trips.slice(0, 6).map((trip, index) => (
                     <Col md={6} lg={4} key={trip.id} className="mb-3">
-                      <Card className="trip-card h-100">
-                        <Card.Header className="trip-card-header">
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                              <h6 className="fw-bold mb-1">{trip.title}</h6>
-                              <small className="opacity-75">{trip.destination}</small>
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 + (index * 0.1) }}
+                        className="h-100"
+                      >
+                        <Card className="trip-card h-100 overflow-hidden border-0 shadow-lg" style={{ borderRadius: '20px' }}>
+                          <div
+                            className="trip-card-image"
+                            style={{
+                              height: '160px',
+                              backgroundImage: `url(${index % 2 === 0 ? '/assets/card-beach.png' : '/assets/card-mountain.png'})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center'
+                            }}
+                          >
+                            <div className="w-100 h-100 bg-black bg-opacity-25 d-flex align-items-end p-3">
+                              <Badge bg={getStatusBadge(trip.status)} className="shadow-sm">
+                                {trip.status}
+                              </Badge>
                             </div>
-                            <Badge bg={getStatusBadge(trip.status)}>
-                              {trip.status}
-                            </Badge>
                           </div>
-                        </Card.Header>
-                        <Card.Body>
-                          <div className="mb-2">
-                            <small className="text-muted">
-                              <FaCalendar className="me-1" />
-                              {formatDate(trip.start_date)} - {formatDate(trip.end_date)}
-                            </small>
-                          </div>
-                          {trip.duration_days && (
+                          <Card.Header className="bg-white border-0 pt-3 pb-0">
+                            <h6 className="fw-bold mb-0 text-dark">{trip.title}</h6>
+                            <small className="text-muted">{trip.destination}</small>
+                          </Card.Header>
+                          <Card.Body>
                             <div className="mb-2">
                               <small className="text-muted">
-                                Duration: {trip.duration_days} days
+                                <FaCalendar className="me-1" />
+                                {formatDate(trip.start_date)} - {formatDate(trip.end_date)}
                               </small>
                             </div>
-                          )}
-                          {trip.budget && (
-                            <div className="mb-2">
-                              <small className="text-muted font-weight-bold">
-                                <FaCoins className="me-1" />
-                                Budget: {formatCurrency(trip.budget)}
-                              </small>
-                            </div>
-                          )}
-                          {trip.sustainability_score && (
-                            <div className="mb-2">
-                              <small className="text-success">
-                                Eco Score: {Math.round(trip.sustainability_score)}%
-                              </small>
-                            </div>
-                          )}
-                        </Card.Body>
-                      </Card>
+                            {trip.duration_days && (
+                              <div className="mb-2">
+                                <small className="text-muted">
+                                  Duration: {trip.duration_days} days
+                                </small>
+                              </div>
+                            )}
+                            {trip.budget && (
+                              <div className="mb-2">
+                                <small className="text-muted fw-bold">
+                                  <FaCoins className="me-1" />
+                                  Budget: {formatCurrency(trip.budget)}
+                                </small>
+                              </div>
+                            )}
+                          </Card.Body>
+                        </Card>
+                      </motion.div>
                     </Col>
                   ))}
                 </Row>

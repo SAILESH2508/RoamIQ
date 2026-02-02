@@ -3,6 +3,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.models.mood_log import MoodLog
 from sqlalchemy import desc
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 mood_bp = Blueprint('mood', __name__)
 
 @mood_bp.route('/history', methods=['GET'])
@@ -24,5 +28,5 @@ def get_mood_history():
         }), 200
         
     except Exception as e:
-        print(f"Error fetching mood history: {e}")
+        logger.error(f"Error fetching mood history: {e}")
         return jsonify({'error': str(e)}), 500

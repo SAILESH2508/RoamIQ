@@ -32,7 +32,7 @@ def create_app():
     
     # SQLite on Windows needs special care with absolute paths (all forward slashes)
     db_uri = f"sqlite:///{db_path.as_posix()}"
-    print(f"DEBUG: Database URI: {db_uri}")
+    app.logger.info(f"Database URI: {db_uri}")
     
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'roamiq-secret-key')
     app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
@@ -64,9 +64,9 @@ def create_app():
             app.register_blueprint(mood_bp, url_prefix='/api/mood')
             app.register_blueprint(ai_bp, url_prefix='/api/ai')
             
-            print("Successfully registered all blueprints")
+            app.logger.info("Successfully registered all blueprints")
         except ImportError as e:
-            print(f"Warning: Could not import routes: {e}")
+            app.logger.warning(f"Could not import routes: {e}")
     
     # Health check endpoint
     @app.route('/api/health')

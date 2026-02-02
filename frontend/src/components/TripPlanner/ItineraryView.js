@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Badge } from 'react-bootstrap';
+import { useCurrency } from '../../contexts/CurrencyContext';
 import {
     FaClock,
     FaUtensils,
@@ -10,6 +11,8 @@ import {
 } from 'react-icons/fa';
 
 const ItineraryView = ({ itinerary }) => {
+    const { formatCurrency } = useCurrency();
+
     if (!itinerary) return null;
 
     const getActivityIcon = (type) => {
@@ -32,11 +35,11 @@ const ItineraryView = ({ itinerary }) => {
                 <h3 className="fw-bold mb-2 gradients-text">{itinerary.trip_title}</h3>
                 <p className="text-muted mb-3 fw-medium">{itinerary.summary}</p>
                 <div className="d-flex align-items-center">
-                    <Badge bg="success" className="me-2 p-2">
+                    <Badge bg="success" className="me-2 p-2 shadow-sm border-0">
                         <FaMoneyBillWave className="me-1" />
-                        Est. Cost: ${itinerary.estimated_total_cost}
+                        Est. Cost: {formatCurrency(itinerary.estimated_total_cost)}
                     </Badge>
-                    <Badge bg="info" className="p-2">
+                    <Badge bg="info" className="p-2 shadow-sm border-0">
                         {itinerary.days?.length} Days
                     </Badge>
                 </div>
@@ -51,11 +54,11 @@ const ItineraryView = ({ itinerary }) => {
 
                         <div className="d-flex flex-column gap-3">
                             {day.activities?.map((activity, actIndex) => (
-                                <Card key={actIndex} className="glass-panel border-0" style={{ color: 'var(--text-primary)' }}>
+                                <Card key={actIndex} className="glass-panel border-0 shadow-sm" style={{ color: 'var(--text-primary)' }}>
                                     <Card.Body className="p-3">
                                         <div className="d-flex">
                                             <div className="me-3 d-flex flex-column align-items-center">
-                                                <div className="rounded-circle bg-white bg-opacity-10 p-2 mb-1 d-flex justify-content-center align-items-center" style={{ width: '40px', height: '40px' }}>
+                                                <div className="rounded-circle bg-white bg-opacity-20 p-2 mb-1 d-flex justify-content-center align-items-center shadow-inner" style={{ width: '40px', height: '40px' }}>
                                                     {getActivityIcon(activity.type)}
                                                 </div>
                                                 <div className="h-100 border-start border-white border-opacity-25" style={{ width: '1px' }}></div>
@@ -64,15 +67,15 @@ const ItineraryView = ({ itinerary }) => {
                                             <div className="flex-grow-1">
                                                 <div className="d-flex justify-content-between align-items-start mb-1">
                                                     <h6 className="fw-bold mb-0 text-primary">{activity.activity}</h6>
-                                                    <small className="text-info">
+                                                    <small className="text-info fw-medium">
                                                         <FaClock className="me-1" />
                                                         {activity.time}
                                                     </small>
                                                 </div>
                                                 <p className="small text-muted mb-2 fw-medium">{activity.description}</p>
                                                 {activity.estimated_cost > 0 && (
-                                                    <Badge bg="warning" text="dark" className="bg-opacity-25 fw-bold">
-                                                        ${activity.estimated_cost}
+                                                    <Badge bg="warning" text="dark" className="bg-opacity-25 fw-bold border-0">
+                                                        {formatCurrency(activity.estimated_cost)}
                                                     </Badge>
                                                 )}
                                             </div>

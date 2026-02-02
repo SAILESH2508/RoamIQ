@@ -12,6 +12,7 @@ import Register from './components/Auth/Register';
 import Dashboard from './components/Dashboard/Dashboard';
 import Profile from './components/Profile/Profile';
 import GenAIHub from './components/AI/GenAIHub';
+import Home from './components/Home';
 import './App.css';
 
 function ProtectedRoute({ children }) {
@@ -46,6 +47,8 @@ function PublicRoute({ children }) {
   return user ? <Navigate to="/dashboard" /> : children;
 }
 
+
+
 function App() {
   return (
     <AuthProvider>
@@ -55,7 +58,7 @@ function App() {
             <Navbar />
             <main className="main-content">
               <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" />} />
+                <Route path="/" element={<Home />} />
 
                 {/* Public Routes */}
                 <Route path="/login" element={

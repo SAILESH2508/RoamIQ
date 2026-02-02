@@ -29,7 +29,10 @@ class APIError(Exception):
 
 def handle_api_error(error):
     """Global error handler for API errors"""
-    response = {'error': error.message}
+    response = {
+        'success': False,
+        'error': error.message
+    }
     if error.payload:
         response.update(error.payload)
     
@@ -44,7 +47,10 @@ def handle_http_exception(error):
 def handle_generic_exception(error):
     """Handle unexpected exceptions"""
     logger.error(f"Unexpected error: {str(error)}\n{traceback.format_exc()}")
-    return jsonify({'error': 'Internal server error'}), 500
+    return jsonify({
+        'success': False,
+        'error': 'Internal server error'
+    }), 500
 
 def log_request_info():
     """Log incoming request information"""

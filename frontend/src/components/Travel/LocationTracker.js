@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { FaMapMarkerAlt, FaSync } from 'react-icons/fa';
 import { Button, Spinner } from 'react-bootstrap';
 
-const LocationTracker = () => {
+const LocationTracker = ({ onUpdate }) => {
     const [location, setLocation] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState(null);
@@ -12,10 +12,22 @@ const LocationTracker = () => {
     const updateLocation = useCallback(async (lat, lng) => {
         setIsUpdating(true);
         try {
-            await axios.post('/api/travel/user/location', { lat, lng }, {
+            // Reverse geocode to get street name/address
+            let address = 'Unknown Location';
+            try {
+                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                address = geoRes.data.display_name;
+            } catch (err) {
+                console.warn('Reverse geocoding failed', err);
+            }
+
+            await axios.post('/api/travel/user/location', { lat, lng, address }, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            setLocation({ lat, lng });
+
+            const newLoc = { lat, lng, address };
+            setLocation(newLoc);
+            if (onUpdate) onUpdate(newLoc);
             setError(null);
         } catch (err) {
             console.error('Failed to update location', err);
@@ -25,7 +37,7 @@ const LocationTracker = () => {
         } finally {
             setIsUpdating(false);
         }
-    }, []);
+    }, [onUpdate]);
 
     const requestLocation = useCallback(() => {
         if (!navigator.geolocation) {
@@ -48,18 +60,19 @@ const LocationTracker = () => {
                 setError(msg);
                 setIsUpdating(false);
             },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     }, [updateLocation]);
 
     useEffect(() => {
-        // Initial request
+        // Initial request on mount only
         requestLocation();
 
-        // Auto-update every 10 minutes if supported
+        // Auto-update every 10 minutes
         const intervalId = setInterval(requestLocation, 600000);
         return () => clearInterval(intervalId);
-    }, [requestLocation]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="location-tracker-status d-flex align-items-center small text-muted">
@@ -67,7 +80,9 @@ const LocationTracker = () => {
             {isUpdating ? (
                 <span><Spinner size="sm" animation="border" className="me-1" /> Updating...</span>
             ) : location ? (
-                <span>Location Active</span>
+                <span className="text-truncate" style={{ maxWidth: '250px' }}>
+                    {location.address || `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`}
+                </span>
             ) : error ? (
                 <span className="text-danger">Location error: {error}</span>
             ) : (

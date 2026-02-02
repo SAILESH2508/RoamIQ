@@ -9,6 +9,9 @@ from backend.models.ticket import Ticket
 from backend.services.ai_service import AIService
 from datetime import datetime, date
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 travel_bp = Blueprint('travel', __name__)
 ai_service = AIService()
@@ -25,10 +28,13 @@ def get_preferences():
             preferences = UserPreference(user_id=user_id)
             db.session.add(preferences)
             db.session.commit()
+            logger.debug(f"Created default preferences for user {user_id}")
         
+        logger.debug(f"Fetched preferences for user {user_id}")
         return jsonify({'preferences': preferences.to_dict()}), 200
         
     except Exception as e:
+        logger.error(f"Error fetching preferences for user {get_jwt_identity()}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @travel_bp.route('/preferences', methods=['PUT'])
@@ -41,6 +47,7 @@ def update_preferences():
         preferences = UserPreference.query.filter_by(user_id=user_id).first()
         if not preferences:
             preferences = UserPreference(user_id=user_id)
+            logger.debug(f"Creating new preferences for user {user_id} during update as none existed.")
         
         # Update preferences
         if 'budget_range' in data:
@@ -68,6 +75,7 @@ def update_preferences():
         db.session.add(preferences)
         db.session.commit()
         
+        logger.debug(f"Preferences updated successfully for user {user_id}")
         return jsonify({
             'message': 'Preferences updated successfully',
             'preferences': preferences.to_dict()
@@ -75,6 +83,7 @@ def update_preferences():
         
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error updating preferences for user {get_jwt_identity()}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @travel_bp.route('/trips', methods=['GET'])
@@ -84,11 +93,13 @@ def get_trips():
         user_id = get_jwt_identity()
         trips = Trip.query.filter_by(user_id=user_id).order_by(Trip.created_at.desc()).all()
         
+        logger.debug(f"Fetched {len(trips)} trips for user {user_id}")
         return jsonify({
             'trips': [trip.to_dict() for trip in trips]
         }), 200
         
     except Exception as e:
+        logger.error(f"Error fetching trips for user {get_jwt_identity()}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # ==========================================
@@ -99,60 +110,78 @@ def get_trips():
 @jwt_required()
 def get_tickets():
     """Get all tickets for the user, optionally filtered by trip"""
-    user_id = get_jwt_identity()
-    trip_id = request.args.get('trip_id')
-    
-    query = Ticket.query.filter_by(user_id=user_id)
-    if trip_id:
-        query = query.filter_by(trip_id=trip_id)
+    try:
+        user_id = get_jwt_identity()
+        trip_id = request.args.get('trip_id')
         
-    tickets = query.all()
-    return jsonify([t.to_dict() for t in tickets])
+        query = Ticket.query.filter_by(user_id=user_id)
+        if trip_id:
+            query = query.filter_by(trip_id=trip_id)
+            
+        tickets = query.all()
+        logger.debug(f"Fetched {len(tickets)} tickets for user {user_id}, trip_id: {trip_id}")
+        return jsonify([t.to_dict() for t in tickets])
+    except Exception as e:
+        logger.error(f"Error fetching tickets for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @travel_bp.route('/tickets', methods=['POST'])
 @jwt_required()
 def add_ticket():
     """Add a new ticket/booking"""
-    user_id = get_jwt_identity()
-    data = request.get_json()
-    
-    if not data.get('ticket_type') or not data.get('title'):
-        return jsonify({'error': 'Missing required fields'}), 400
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
         
-    ticket = Ticket(
-        user_id=user_id,
-        trip_id=data.get('trip_id'),
-        ticket_type=data['ticket_type'],
-        title=data['title'],
-        description=data.get('description'),
-        booking_reference=data.get('booking_reference'),
-        confirmation_number=data.get('confirmation_number'),
-        price=data.get('price'),
-        currency=data.get('currency', 'USD'),
-        valid_from=datetime.fromisoformat(data['valid_from']) if data.get('valid_from') and str(data['valid_from']).strip() else None,
-        valid_until=datetime.fromisoformat(data['valid_until']) if data.get('valid_until') and str(data['valid_until']).strip() else None,
-        status=data.get('status', 'confirmed')
-    )
-    
-    if data.get('additional_info'):
-        ticket.set_additional_info(data['additional_info'])
+        if not data.get('ticket_type') or not data.get('title'):
+            logger.debug(f"Missing required fields for adding ticket for user {user_id}")
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        ticket = Ticket(
+            user_id=user_id,
+            trip_id=data.get('trip_id'),
+            ticket_type=data['ticket_type'],
+            title=data['title'],
+            description=data.get('description'),
+            booking_reference=data.get('booking_reference'),
+            confirmation_number=data.get('confirmation_number'),
+            price=data.get('price'),
+            currency=data.get('currency', 'USD'),
+            valid_from=datetime.fromisoformat(data['valid_from']) if data.get('valid_from') and str(data['valid_from']).strip() else None,
+            valid_until=datetime.fromisoformat(data['valid_until']) if data.get('valid_until') and str(data['valid_until']).strip() else None,
+            status=data.get('status', 'confirmed')
+        )
         
-    db.session.add(ticket)
-    db.session.commit()
-    
-    return jsonify(ticket.to_dict()), 201
+        if data.get('additional_info'):
+            ticket.set_additional_info(data['additional_info'])
+            
+        db.session.add(ticket)
+        db.session.commit()
+        
+        logger.debug(f"Ticket added successfully for user {user_id}: {ticket.id}")
+        return jsonify(ticket.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding ticket for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @travel_bp.route('/tickets/<int:ticket_id>', methods=['DELETE'])
 @jwt_required()
 def delete_ticket(ticket_id):
     """Remove a ticket"""
-    user_id = get_jwt_identity()
-    ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first_or_404()
-    
-    db.session.delete(ticket)
-    db.session.commit()
-    
-    return jsonify({'message': 'Ticket deleted'})
+    try:
+        user_id = get_jwt_identity()
+        ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first_or_404()
+        
+        db.session.delete(ticket)
+        db.session.commit()
+        
+        logger.debug(f"Ticket {ticket_id} deleted successfully for user {user_id}")
+        return jsonify({'message': 'Ticket deleted'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting ticket {ticket_id} for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # ==========================================
 # LOCATION SERVICES
@@ -167,25 +196,28 @@ def update_location():
         data = request.get_json()
         
         if not data or 'lat' not in data or 'lng' not in data:
+            logger.debug(f"Missing lat/lng for user {user_id} location update")
             return jsonify({'error': 'Latitude and longitude required'}), 400
             
         user = User.query.get(user_id)
         if not user:
+            logger.debug(f"User {user_id} not found for location update")
             return jsonify({'error': 'User not found'}), 404
 
         location_data = {
             'lat': data['lat'],
             'lng': data['lng'],
+            'address': data.get('address', ''),
             'updated_at': datetime.utcnow().isoformat()
         }
         
         user.last_location = json.dumps(location_data)
         db.session.commit()
         
-        print(f"DEBUG: Updated location for user {user_id}: {location_data}")
+        logger.debug(f"Updated location for user {user_id}: {location_data}")
         return jsonify({'message': 'Location updated', 'location': location_data})
     except Exception as e:
-        print(f"ERROR: Failed to update location for user {get_jwt_identity()}: {str(e)}")
+        logger.error(f"Failed to update location for user {get_jwt_identity()}: {str(e)}")
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 

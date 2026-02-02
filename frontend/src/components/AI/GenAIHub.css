@@ -174,3 +174,25 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: rgba(107, 114, 128, 0.8);
 }
+
+.ai-input-field:focus {
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1) !important;
+    border-color: #f97316 !important;
+}
+
+.ai-input-field {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Width Utilities */
+.max-w-4xl {
+    max-width: 896px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.max-w-2xl {
+    max-width: 672px;
+    margin-left: auto;
+    margin-right: auto;
+}

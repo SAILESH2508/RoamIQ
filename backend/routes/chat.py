@@ -8,6 +8,9 @@ from datetime import datetime
 import json
 import asyncio
 from backend.extensions import db
+import logging
+
+logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -53,7 +56,7 @@ def process_message():
                 db.session.add(mood_log)
                 db.session.commit()
         except Exception as log_error:
-            print(f"Error saving mood log: {log_error}")
+            logger.error(f"Error saving mood log: {log_error}")
             db.session.rollback()
         
         return jsonify({
@@ -65,7 +68,7 @@ def process_message():
         }), 200
         
     except Exception as e:
-        print(f"Unexpected error in process_message: {e}")
+        logger.error(f"Unexpected error in process_message: {e}")
         return jsonify({'error': str(e)}), 500
 
 @chat_bp.route('/generate-itinerary', methods=['POST'])
