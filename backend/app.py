@@ -53,13 +53,11 @@ def create_app():
     with app.app_context():
         try:
             from backend.routes.auth import auth_bp
-            from backend.routes.chat import chat_bp
             from backend.routes.travel import travel_bp
             from backend.routes.mood import mood_bp
             from backend.routes.ai_routes import ai_bp
             
             app.register_blueprint(auth_bp, url_prefix='/api/auth')
-            app.register_blueprint(chat_bp, url_prefix='/api/chat')
             app.register_blueprint(travel_bp, url_prefix='/api/travel')
             app.register_blueprint(mood_bp, url_prefix='/api/mood')
             app.register_blueprint(ai_bp, url_prefix='/api/ai')

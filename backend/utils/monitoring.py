@@ -7,7 +7,6 @@ from functools import wraps
 from flask import request, g
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import psutil
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class PerformanceMonitor:
                 
                 return response
             
-            except Exception as e:
+            except Exception:
                 REQUEST_COUNT.labels(
                     method=request.method,
                     endpoint=request.endpoint or 'unknown',

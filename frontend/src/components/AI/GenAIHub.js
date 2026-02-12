@@ -3,10 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { Container, Button, Form, Modal, Spinner, Badge } from 'react-bootstrap';
 import {
     FaRobot, FaPaperPlane, FaMicrophone, FaStop, FaPlus,
-    FaImage, FaSuitcase, FaTimes, FaUser, FaTicketAlt, FaMapMarkedAlt, FaSync, FaFilePdf
+    FaImage, FaSuitcase, FaTimes, FaUser, FaMapMarkedAlt, FaSync, FaFilePdf
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
-import TicketManager from '../Travel/TicketManager';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import ReactMarkdown from 'react-markdown';

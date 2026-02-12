@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   FaComments, FaMapMarkedAlt, FaCalendar, FaCoins, FaUsers,
-  FaHome, FaSuitcase, FaChartBar, FaGlobe, FaChevronRight, FaTicketAlt, FaMapMarkerAlt, FaSync
+  FaHome, FaSuitcase, FaChartBar, FaGlobe, FaChevronRight, FaMapMarkerAlt
 } from 'react-icons/fa';
 import axios from 'axios';
 import { useCurrency } from '../../contexts/CurrencyContext';

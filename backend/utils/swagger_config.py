@@ -2,8 +2,7 @@
 Swagger/OpenAPI documentation configuration
 """
 from flask import Flask
-from flasgger import Swagger, swag_from
-from flasgger.utils import swag_from
+from flasgger import Swagger
 
 def init_swagger(app: Flask):
     """Initialize Swagger documentation"""
