@@ -24,14 +24,12 @@ const Navbar = () => {
       className={`navbar-premium fixed-top ${scrolled ? 'scrolled' : ''}`}
     >
       <Container fluid className="px-lg-5">
-        <LinkContainer to="/">
-          <BootstrapNavbar.Brand className="d-flex align-items-center">
-            <div className="logo-container-premium">
-              <FaRobot className="text-white" size={20} />
-            </div>
-            <span className="logo-text-premium">RoamIQ</span>
-          </BootstrapNavbar.Brand>
-        </LinkContainer>
+        <BootstrapNavbar.Brand as={Link} to="/" className="d-flex align-items-center">
+          <div className="logo-container-premium">
+            <FaRobot className="text-white" size={20} />
+          </div>
+          <span className="logo-text-premium">RoamIQ</span>
+        </BootstrapNavbar.Brand>
 
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" className="border-0 shadow-none" />
 
