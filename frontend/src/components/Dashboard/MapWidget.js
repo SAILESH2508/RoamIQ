@@ -14,25 +14,33 @@ L.Icon.Default.mergeOptions({
 // Component to handle map centering and rendering stability
 const ChangeView = ({ center, zoom }) => {
     const map = useMap();
+    const [hasCentered, setHasCentered] = React.useState(false);
+
     React.useEffect(() => {
-        map.setView(center, zoom);
-        // Force map to recalculate size - fixes partial rendering issues
-        setTimeout(() => {
-            map.invalidateSize();
-        }, 100);
-    }, [center, zoom, map]);
+        if (center && (!hasCentered || center[0] !== 20)) {
+            map.setView(center, zoom);
+            setHasCentered(true);
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+    }, [center, zoom, map, hasCentered]);
     return null;
 };
 
+const defaultCenter = [20, 0]; // World center
+const defaultZoom = 2;
+
 const MapWidget = ({ trips = [], userLocation = null }) => {
-    const defaultCenter = [20, 0]; // World center
-    const defaultZoom = 2;
 
-    const center = React.useMemo(() =>
-        userLocation ? [userLocation.lat, userLocation.lng] : defaultCenter,
-        [userLocation]);
+    const center = React.useMemo(() => {
+        if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lng === 'number') {
+            return [userLocation.lat, userLocation.lng];
+        }
+        return defaultCenter;
+    }, [userLocation]);
 
-    const zoom = userLocation ? 16 : defaultZoom;
+    const zoom = userLocation ? 13 : defaultZoom;
 
     return (
         <div className="map-widget-container glass-panel overflow-hidden" style={{ height: '400px', width: '100%', position: 'relative', zIndex: 1 }}>

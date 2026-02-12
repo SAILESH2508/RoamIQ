@@ -12,6 +12,7 @@ import Register from './components/Auth/Register';
 import Dashboard from './components/Dashboard/Dashboard';
 import Profile from './components/Profile/Profile';
 import GenAIHub from './components/AI/GenAIHub';
+import TripDetails from './components/Travel/TripDetails';
 import Home from './components/Home';
 import './App.css';
 
@@ -81,6 +82,12 @@ function App() {
                 <Route path="/ai" element={
                   <ProtectedRoute>
                     <GenAIHub />
+                  </ProtectedRoute>
+                } />
+                <Route path="/plan-trip" element={<Navigate to={{ pathname: "/ai", search: "?intent=plan" }} replace />} />
+                <Route path="/trips/:id" element={
+                  <ProtectedRoute>
+                    <TripDetails />
                   </ProtectedRoute>
                 } />
                 <Route path="/profile" element={

@@ -19,16 +19,17 @@ class AIService:
     async def get_chat_response(
         self, 
         message: str, 
-        model: str = "gemini-1.5-flash",
+        model: str = "gemini-2.0-flash-lite",
         conversation_id: Optional[str] = None,
         user_preferences: Optional[Dict] = None,
         user_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Generate a contextual chat response."""
+        """Generate a contextual chat response with tool-calling support."""
         try:
             from backend.models.chat_message import ChatMessage
             from backend.extensions import db
             from backend.app import app
+            from backend.services.ai.tools import AVAILABLE_TOOLS, TOOL_DECLARATIONS
 
             # Ensure user_id is integer if provided
             if user_id:
@@ -37,83 +38,129 @@ class AIService:
                 except (ValueError, TypeError):
                     pass
 
-            # 1. Retrieve history for context BEFORE saving current
-            history = []
-            if conversation_id:
+            # 1 & 3. Parallelize History and RAG
+            async def get_history():
+                if not conversation_id:
+                    return []
                 with app.app_context():
-                    # Get last 10 messages for context (5 pairs)
                     past_messages = ChatMessage.query.filter_by(conversation_id=conversation_id)\
                         .order_by(ChatMessage.timestamp.desc())\
-                        .limit(10).all()
-                    
-                    past_messages.reverse() # Back to chronological
-                    
-                    for msg in past_messages:
-                        role = 'user' if msg.role == 'user' else 'model'
-                        history.append({"role": role, "parts": [{"text": msg.content}]})
+                        .limit(8).all() # Slightly reduced limit for speed
+                    past_messages.reverse()
+                    return [{"role": 'user' if msg.role == 'user' else 'model', "parts": [{"text": msg.content}]} for msg in past_messages]
 
-            # 2. Save user message to DB
+            async def get_rag_context():
+                # Only RAG if there's enough substance in the query
+                if len(message.split()) > 3 and any(word in message.lower() for word in ['where', 'plan', 'visit', 'trip', 'travel', 'hotel', 'flight', 'recommend']):
+                    related_docs = await rag_service.search(message)
+                    if related_docs:
+                        return "\nRelevant Info:\n" + "\n".join([d['content'] for d in related_docs])
+                return ""
+
+            # Run history retrieval and RAG search in parallel
+            history, context = await asyncio.gather(get_history(), get_rag_context())
+
+            # 2. Save user message (Done after history pull to avoid self-inclusion)
             if conversation_id:
                  with app.app_context():
-                    user_msg = ChatMessage(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        role='user',
-                        content=message
-                    )
+                    user_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='user', content=message)
                     db.session.add(user_msg)
                     db.session.commit()
 
-            # 3. RAG Search for context if it's a travel query
-            context = ""
-            if any(word in message.lower() for word in ['where', 'plan', 'visit', 'how', 'trip', 'travel']):
-                related_docs = await rag_service.search(message)
-                if related_docs:
-                    context = "\nRelevant Info:\n" + "\n".join([d['content'] for d in related_docs])
-
-            # 2. Build system prompt
-            system_prompt = "You are RoamIQ, a premium AI travel assistant. "
-            if user_preferences:
-                system_prompt += f"User prefers: {json.dumps(user_preferences)}. "
+            # 4. System Prompt
+            system_prompt = (
+                "You are RoamIQ, a professional travel orchestrator. "
+                "Help users plan trips, book tickets, manage expenses, and generate reports. "
+                "Be concise and focus on immediate travel needs."
+            )
             
-            # Add user location if available
             if user_id:
                 from backend.models.user import User
-                user = User.query.get(user_id)
-                if user and user.last_location:
-                    system_prompt += f"User's current location: {user.last_location}. "
-            
-            if context:
-                system_prompt += f"Use this context for more accurate advice: {context}"
+                with app.app_context():
+                    user = User.query.get(user_id)
+                    if user and user.last_location:
+                        system_prompt += f"\nUser's current location: {user.last_location}"
 
-            # 4. Generate response using LLM provider
-            full_prompt = history + [{"role": "user", "parts": [{"text": message}]}]
+            if context:
+                system_prompt += f"\n\nContext for advice: {context}"
+
+            # 5. Tool-Calling Loop
+            contents = history + [{"role": "user", "parts": [{"text": message}]}]
+            tools = [{"function_declarations": TOOL_DECLARATIONS}]
             
-            ai_response = await llm_provider.generate_response(
-                prompt=full_prompt,
+            # Initial LLM call
+            response = await llm_provider.generate_response(
+                prompt=contents,
                 model_name=model,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
+                tools=tools
             )
 
-            # 5. Save AI response to DB
+            # Execution loop (up to 5 iterations to prevent infinite loops)
+            for _ in range(5):
+                if isinstance(response, dict) and "tool_calls" in response:
+                    tool_results_parts = []
+                    
+                    # Execute each tool call
+                    for tc in response["tool_calls"]:
+                        tool_name = tc["name"]
+                        args = tc["args"]
+                        
+                        logger.info(f"AI calling tool: {tool_name} with {args}")
+                        
+                        if tool_name in AVAILABLE_TOOLS:
+                            # Inject user_id into tool args
+                            args['user_id'] = user_id
+                            
+                            # Execute within app context
+                            with app.app_context():
+                                try:
+                                    result = AVAILABLE_TOOLS[tool_name](**args)
+                                except Exception as e:
+                                    logger.error(f"Tool {tool_name} failed: {e}")
+                                    result = {"error": str(e)}
+                            
+                            # Add to response parts for next LLM iteration
+                            tool_results_parts.append({
+                                "function_response": {
+                                    "name": tool_name,
+                                    "response": result
+                                }
+                            })
+
+                    # Use the preserved model message from the provider to keep all metadata (thought signatures, etc.)
+                    contents.append(response["model_message"])
+                    
+                    # Add result parts to contents
+                    contents.append({"role": "user", "parts": tool_results_parts})
+                    
+                    # Call LLM again with results
+                    response = await llm_provider.generate_response(
+                        prompt=contents,
+                        model_name=model,
+                        system_prompt=system_prompt,
+                        tools=tools
+                    )
+                else:
+                    # Final text response received
+                    break
+
+            # Handle final response
+            ai_text = response if isinstance(response, str) else response.get("text", "I've processed your request.")
+
+            # 6. Save AI response
             if conversation_id:
                  with app.app_context():
-                    ai_msg = ChatMessage(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        role='ai',
-                        content=ai_response
-                    )
+                    ai_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='ai', content=ai_text)
                     db.session.add(ai_msg)
                     db.session.commit()
 
-            # 6. Analyze mood (simple internal logic for now)
             mood = self._basic_mood_analysis(message)
 
             return {
-                "ai_response": ai_response,
+                "ai_response": ai_text,
                 "mood_analysis": mood,
-                "suggestions": ["Tell me more", "Plan this trip", "What about budget?"]
+                "suggestions": ["View my trips", "What's my budget?", "Generate a trip report"]
             }
 
         except Exception as e:
@@ -297,6 +344,39 @@ class AIService:
             "polarity": polarity,
             "subjectivity": subjectivity
         }
+
+    async def get_mood_recommendations(self, mood: str, energy: str) -> List[Dict[str, Any]]:
+        """Generate travel recommendations based on current mood and energy."""
+        prompt = f"""The user is currently feeling '{mood}' with '{energy}' energy. 
+        Suggest 3 travel destinations or types of experiences that would perfectly match this vibe.
+        For each, provide:
+        - name: Destination or activity name
+        - reason: Why it matches their current mood
+        - vibe: A short description of the atmosphere
+        - icon: A relevant emoji
+        
+        Return ONLY a JSON array of objects.
+        """
+        
+        response = await llm_provider.generate_response(
+            prompt=prompt,
+            system_prompt="You are a travel psychologist and expert. You provide personalized, vibe-matched travel advice in JSON format."
+        )
+        
+        try:
+            clean_res = response.strip()
+            if clean_res.startswith("```json"):
+                clean_res = clean_res[7:-3].strip()
+            elif clean_res.startswith("```"):
+                clean_res = clean_res[3:-3].strip()
+            return json.loads(clean_res)
+        except Exception as e:
+            logger.error(f"Failed to parse mood recommendations: {e}")
+            return [
+                {"name": "Mountain Retreat", "reason": "Peaceful atmosphere to recharge", "vibe": "Serene & Quiet", "icon": "🏔️"},
+                {"name": "Tropical Beach", "reason": "Sun and sand to lift spirits", "vibe": "Relaxing & Warm", "icon": "🏖️"},
+                {"name": "Vibrant Capital", "reason": "High energy and culture", "vibe": "Exciting & Busy", "icon": "🏙️"}
+            ]
 
     async def get_user_patterns(self, user_id: Optional[int] = None) -> Dict[str, Any]:
         """Analyze user behavior and travel preferences."""

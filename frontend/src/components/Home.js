@@ -39,9 +39,9 @@ const Home = () => {
                                             GO TO DASHBOARD <FaArrowRight className="ms-2" />
                                         </Button>
                                     </LinkContainer>
-                                    <LinkContainer to="/ai">
+                                    <LinkContainer to={{ pathname: "/ai", search: "?intent=plan" }}>
                                         <Button size="lg" variant="light" className="px-5 py-3 rounded-pill fw-black shadow-lg" style={{ backgroundColor: '#ffffff', color: '#000000', border: 'none' }}>
-                                            ASK AI ITINERARY
+                                            PLAN NEW TRIP
                                         </Button>
                                     </LinkContainer>
                                 </>

@@ -3,7 +3,7 @@ import { Navbar as BootstrapNavbar, Nav, Container, NavDropdown } from 'react-bo
 import { LinkContainer } from 'react-router-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { FaRobot, FaTachometerAlt, FaGlobe, FaChevronDown } from 'react-icons/fa';
+import { FaRobot, FaTachometerAlt, FaGlobe, FaChevronDown, FaTicketAlt, FaSync } from 'react-icons/fa';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -59,6 +59,21 @@ const Navbar = () => {
                     AI Hub
                   </Nav.Link>
                 </LinkContainer>
+
+                <LinkContainer to={{ pathname: '/dashboard', search: '?tab=bookings' }}>
+                  <Nav.Link className="nav-link-premium">
+                    <FaTicketAlt />
+                    Bookings
+                  </Nav.Link>
+                </LinkContainer>
+
+                <Nav.Link
+                  className="nav-link-premium"
+                  onClick={() => window.open('https://weather-prediction-nu-nine.vercel.app/', '_blank')}
+                >
+                  <FaSync className="text-warning" />
+                  Weather
+                </Nav.Link>
               </>
             ) : (
               <>

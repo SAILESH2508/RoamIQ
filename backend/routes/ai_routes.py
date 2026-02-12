@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
 
-def run_async(coro):
-    """Helper to run async code in sync Flask routes."""
-    return asyncio.run(coro)
+# Removed run_async - Flask 2.0+ handles async routes natively
 
 @ai_bp.route('/models', methods=['GET'])
 @jwt_required()
@@ -39,7 +37,7 @@ def get_available_models():
 @ai_bp.route('/chat', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def chat_with_ai():
+async def chat_with_ai():
     """Unified chat endpoint using the NEW AIService."""
     try:
         data = request.get_json()
@@ -49,16 +47,17 @@ def chat_with_ai():
         model = data.get('model', 'gemini-1.5-flash')
         conversation_id = data.get('conversation_id')
         
-        # Run the async service
+        # Get user identity and resolve to ID
         user_identity = get_jwt_identity()
         user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
 
-        result = run_async(ai_service.get_chat_response(
+        # Directly await the async service
+        result = await ai_service.get_chat_response(
             message=message,
             model=model,
             conversation_id=conversation_id,
             user_id=user_id
-        ))
+        )
         
         return jsonify(result)
     
@@ -90,11 +89,11 @@ def get_chat_history(conversation_id):
 @ai_bp.route('/user/patterns', methods=['GET'])
 @jwt_required()
 @api_error_handler
-def get_user_patterns():
+async def get_user_patterns():
     """Retrieve AI-analyzed user patterns."""
     user_identity = get_jwt_identity()
     user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
-    result = run_async(ai_service.get_user_patterns(user_id=user_id))
+    result = await ai_service.get_user_patterns(user_id=user_id)
     return jsonify(result)
 
 @ai_bp.route('/chat/conversations', methods=['GET'])
@@ -149,18 +148,18 @@ def get_conversations():
 @ai_bp.route('/generate/itinerary', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def generate_itinerary():
+async def generate_itinerary():
     """Structured itinerary generation."""
     try:
         data = request.get_json()
         validate_required_fields(data, ['destination', 'days', 'budget'])
         
-        itinerary = run_async(ai_service.generate_itinerary(
+        itinerary = await ai_service.generate_itinerary(
             destination=data['destination'],
             days=int(data['days']),
             budget=data['budget'],
             preferences=data.get('preferences')
-        ))
+        )
         
         return jsonify(itinerary)
     except Exception as e:
@@ -170,17 +169,17 @@ def generate_itinerary():
 @ai_bp.route('/generate/packing-list', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def generate_packing_list():
+async def generate_packing_list():
     """Smart packing list generation."""
     try:
         data = request.get_json()
         validate_required_fields(data, ['destination', 'duration'])
         
-        packing_list = run_async(ai_service.generate_packing_list(
+        packing_list = await ai_service.generate_packing_list(
             destination=data['destination'],
             duration=int(data['duration']),
             activities=data.get('activities', [])
-        ))
+        )
         
         return jsonify(packing_list)
     except Exception as e:
@@ -190,7 +189,7 @@ def generate_packing_list():
 @ai_bp.route('/file/analyze', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def analyze_file():
+async def analyze_file():
     """Analyze ANY uploaded file."""
     try:
         if 'file' not in request.files:
@@ -201,7 +200,7 @@ def analyze_file():
         mime_type = file.mimetype
         filename = file.filename
         
-        result = run_async(ai_service.analyze_file(file_data, mime_type, filename))
+        result = await ai_service.analyze_file(file_data, mime_type, filename)
         return jsonify(result)
     except Exception as e:
         logger.error(f"File analysis route error: {e}")
@@ -210,7 +209,7 @@ def analyze_file():
 @ai_bp.route('/audio/transcribe', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def transcribe_audio():
+async def transcribe_audio():
     """Transcribe voice input."""
     try:
         if 'audio' not in request.files:
@@ -224,11 +223,11 @@ def transcribe_audio():
         user_identity = get_jwt_identity()
         user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
         
-        result = run_async(ai_service.transcribe_audio(
+        result = await ai_service.transcribe_audio(
             audio_data, 
             user_id=user_id, 
             conversation_id=conversation_id
-        ))
+        )
         return jsonify(result)
     except Exception as e:
         logger.error(f"Transcription route error: {e}")
@@ -237,13 +236,13 @@ def transcribe_audio():
 @ai_bp.route('/audio/synthesize', methods=['POST'])
 @jwt_required()
 @api_error_handler
-def synthesize_audio():
+async def synthesize_audio():
     """Synthesize text to speech."""
     try:
         data = request.get_json()
         text = data.get('text', '')
         
-        result = run_async(ai_service.synthesize_speech(text))
+        result = await ai_service.synthesize_speech(text)
         return jsonify(result)
     except Exception as e:
         logger.error(f"Synthesis route error: {e}")

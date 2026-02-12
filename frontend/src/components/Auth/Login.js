@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FaEnvelope, FaLock, FaSignInAlt } from 'react-icons/fa';
+// No icons used
 
 const Login = () => {
   const [formData, setFormData] = useState({

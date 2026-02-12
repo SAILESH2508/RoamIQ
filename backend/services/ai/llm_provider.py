@@ -63,7 +63,7 @@ class LLMProvider:
         system_prompt: Optional[str] = None,
         tried_models: Optional[List[str]] = None,
         **kwargs
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         if tried_models is None:
             tried_models = []
             
@@ -155,7 +155,10 @@ class LLMProvider:
     async def _call_google(self, prompt, model_name, system, **kwargs):
         client = self.clients[ModelProvider.GOOGLE]
         
-        contents = prompt if isinstance(prompt, list) else [prompt]
+        contents = prompt if isinstance(prompt, list) else [{"role": "user", "parts": [{"text": str(prompt)}]}]
+        
+        # Tools support
+        tools = kwargs.get('tools')
         
         # Retry parameters
         max_retries = 3
@@ -163,16 +166,40 @@ class LLMProvider:
         
         for attempt in range(max_retries):
             try:
-                # New SDK call
-                response = client.models.generate_content(
+                # New SDK call - using asynchronous 'aio' attribute to prevent blocking the event loop
+                response = await client.aio.models.generate_content(
                     model=model_name,
                     contents=contents,
                     config=types.GenerateContentConfig(
                         temperature=kwargs.get('temperature', 0.7),
                         top_p=kwargs.get('top_p', 0.9),
-                        system_instruction=system
+                        system_instruction=system,
+                        tools=tools
                     )
                 )
+                
+                # Handle Tool Calls
+                tool_calls = []
+                content_parts = []
+                if response.candidates and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        # Serialize the part as a dict to preserve all fields (thought_signature, etc.)
+                        part_dict = part.model_dump(exclude_none=True)
+                        content_parts.append(part_dict)
+                        
+                        if part.function_call:
+                            tool_calls.append({
+                                "name": part.function_call.name,
+                                "args": part.function_call.args
+                            })
+                
+                if tool_calls:
+                    return {
+                        "tool_calls": tool_calls, 
+                        "model_message": {"role": "model", "parts": content_parts},
+                        "text": response.text or ""
+                    }
+                
                 return response.text
                 
             except Exception as e:

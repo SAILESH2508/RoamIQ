@@ -35,9 +35,15 @@ class RAGService:
         
         try:
             # Note: For real embeddings we'd need a model, using chromadb's default for now
-            results = self.collections[collection].query(
-                query_texts=[query],
-                n_results=n_results
+            # Run blocking query in a thread to keep async loop responsive
+            import asyncio
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None, 
+                lambda: self.collections[collection].query(
+                    query_texts=[query],
+                    n_results=n_results
+                )
             )
             
             formatted = []

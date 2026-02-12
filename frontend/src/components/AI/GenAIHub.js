@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Container, Button, Form, Modal, Spinner, Badge } from 'react-bootstrap';
 import {
     FaRobot, FaPaperPlane, FaMicrophone, FaStop, FaPlus,
-    FaImage, FaSuitcase, FaTimes, FaUser, FaTicketAlt, FaMapMarkedAlt, FaSync
+    FaImage, FaSuitcase, FaTimes, FaUser, FaTicketAlt, FaMapMarkedAlt, FaSync, FaFilePdf
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
 import TicketManager from '../Travel/TicketManager';
@@ -24,6 +25,7 @@ const GenAIHub = () => {
     });
     const [conversations, setConversations] = useState([]);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [upcomingTrip, setUpcomingTrip] = useState(null);
 
     // Feature States
 
@@ -37,7 +39,8 @@ const GenAIHub = () => {
     const audioChunksRef = useRef([]);
 
     const messagesEndRef = useRef(null);
-    const fileInputRef = useRef(null);
+    const imageInputRef = useRef(null);
+    const docInputRef = useRef(null);
 
     const fetchConversations = React.useCallback(async () => {
         try {
@@ -48,6 +51,27 @@ const GenAIHub = () => {
         } catch (err) {
             console.error("Failed to fetch conversations", err);
             toast.error("Failed to fetch chat history. Check connection.");
+        }
+    }, []);
+
+    const fetchUpcomingTrip = React.useCallback(async () => {
+        try {
+            const res = await axios.get('/api/travel/trips', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const trips = res.data.trips || [];
+            if (trips.length > 0) {
+                const now = new Date();
+                // Find upcoming trip (closest start date in future)
+                const upcoming = trips
+                    .filter(t => t.start_date && new Date(t.start_date) >= now)
+                    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))[0];
+
+                // Fallback to most recent if no future trip
+                setUpcomingTrip(upcoming || trips[0]);
+            }
+        } catch (err) {
+            console.error("Failed to fetch upcoming trip", err);
         }
     }, []);
 
@@ -65,7 +89,16 @@ const GenAIHub = () => {
                 timestamp: new Date(msg.timestamp)
             }));
 
-            setMessages(formatted);
+            if (formatted.length === 0) {
+                setMessages([{
+                    id: 'welcome',
+                    type: 'ai',
+                    content: "Hi! I'm RoamIQ. 🌍\n\nI can plan trips, see landmarks, or listen to your ideas. \n\nTap **+** to upload photos or generate packing lists!",
+                    timestamp: new Date()
+                }]);
+            } else {
+                setMessages(formatted);
+            }
             setConversationId(id);
             setActiveSidebar('chat');
         } catch (err) {
@@ -75,12 +108,27 @@ const GenAIHub = () => {
         }
     }, []);
 
-    // Initial Load
+    const location = useLocation();
+
+    // Initial Load & Intent Handling (Only generates fresh ID if none exists or specific intent)
     useEffect(() => {
-        if (isInitialLoad) {
-            const savedConvId = localStorage.getItem('roamiq_active_conv_id');
-            if (savedConvId) {
-                loadConversation(savedConvId);
+        const searchParams = new URLSearchParams(location.search);
+        const intent = searchParams.get('intent');
+        const existingConvId = localStorage.getItem('roamiq_active_conv_id');
+
+        // Only start fresh if: 1. No existing ID OR 2. Specific 'new' intent OR 3. First time landing without messages
+        if (!existingConvId || intent === 'new') {
+            const newId = uuidv4();
+            setConversationId(newId);
+            localStorage.setItem('roamiq_active_conv_id', newId);
+
+            if (intent === 'plan') {
+                setMessages([{
+                    id: 'welcome-plan-' + Date.now(),
+                    type: 'ai',
+                    content: "Hi! What trip are you going to plan for next?? ✈️🌍",
+                    timestamp: new Date()
+                }]);
             } else {
                 setMessages([{
                     id: 'welcome',
@@ -89,13 +137,22 @@ const GenAIHub = () => {
                     timestamp: new Date()
                 }]);
             }
+        } else if (messages.length === 0) {
+            // We have an existing ID but no messages loaded yet (initial mount)
+            loadConversation(existingConvId);
+        }
+
+        if (isInitialLoad) {
             fetchConversations();
+            fetchUpcomingTrip();
             setIsInitialLoad(false);
         }
-    }, [isInitialLoad, loadConversation, fetchConversations]);
+    }, [location.search, fetchConversations, fetchUpcomingTrip, loadConversation, isInitialLoad, messages.length]);
 
     useEffect(() => {
-        localStorage.setItem('roamiq_active_conv_id', conversationId);
+        if (conversationId) {
+            localStorage.setItem('roamiq_active_conv_id', conversationId);
+        }
     }, [conversationId]);
 
     const startNewChat = React.useCallback(() => {
@@ -309,17 +366,6 @@ const GenAIHub = () => {
                         <span className="fw-bold">AI Chat</span>
                     </Button>
                     <Button
-                        variant={activeSidebar === 'bookings' ? 'primary' : 'light'}
-                        className={`text-start border-0 rounded-3 p-3 d-flex align-items-center gap-3 ${activeSidebar === 'bookings' ? 'bg-primary-gradient text-white' : ''}`}
-                        onClick={() => setActiveSidebar('bookings')}
-                    >
-                        <FaTicketAlt size={20} />
-                        <div className="d-flex flex-column lh-sm">
-                            <span className="fw-bold">My Bookings</span>
-                            <span className="x-small opacity-75">Tickets & Events</span>
-                        </div>
-                    </Button>
-                    <Button
                         variant={activeSidebar === 'history' ? 'primary' : 'light'}
                         className={`text-start border-0 rounded-3 p-3 d-flex align-items-center gap-3 ${activeSidebar === 'history' ? 'bg-primary-gradient text-white' : ''}`}
                         onClick={() => { setActiveSidebar('history'); fetchConversations(); }}
@@ -333,15 +379,41 @@ const GenAIHub = () => {
                 </div>
 
                 {activeSidebar === 'chat' && (
-                    <Button variant="outline-primary" className="mt-3 rounded-pill btn-sm border-2 fw-bold" onClick={startNewChat}>
+                    <Button variant="outline-primary" className="mb-4 rounded-pill btn-sm border-2 fw-bold" onClick={startNewChat}>
                         + New Chat
                     </Button>
                 )}
 
-                <div className="mt-auto p-3 glass-panel rounded-4">
-                    <div className="small text-muted mb-1">Upcoming Trip</div>
-                    <div className="fw-bold small">Paris getaway</div>
-                    <div className="x-small text-info">Next week</div>
+                <div className="mt-auto d-flex flex-column gap-3">
+                    <div
+                        className="p-3 glass-panel rounded-4 cursor-pointer hover-scale border-0"
+                        onClick={() => setChecklistPrompt({ ...checkListPrompt, show: true })}
+                        style={{ background: 'rgba(255, 255, 255, 0.5)' }}
+                    >
+                        <div className="d-flex align-items-center gap-3">
+                            <div className="bg-warning rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #ff9d6c 0%, #ff6b6b 100%)' }}>
+                                <FaSuitcase className="text-white" size={18} />
+                            </div>
+                            <div className="lh-1">
+                                <div className="fw-bold small mb-0">Packing List</div>
+                                <div className="x-small text-muted">Generate checklist</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-3 glass-panel rounded-4" style={{ background: 'rgba(255, 255, 255, 0.5)' }}>
+                        <div className="small text-muted mb-1">Upcoming Trip</div>
+                        {upcomingTrip ? (
+                            <>
+                                <div className="fw-bold small text-truncate">{upcomingTrip.title}</div>
+                                <div className="x-small text-info">
+                                    {upcomingTrip.start_date ? new Date(upcomingTrip.start_date).toLocaleDateString() : 'TBD'}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="x-small text-muted italic">No planned trips</div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -387,6 +459,21 @@ const GenAIHub = () => {
 
                                             {/* Packing List */}
                                             {msg.packingList && <PackingListBubble items={msg.packingList} />}
+
+                                            {/* Quick Suggestions */}
+                                            {msg.suggestions && msg.suggestions.length > 0 && (
+                                                <div className="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+                                                    {msg.suggestions.map((s, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            className="btn btn-sm btn-outline-warning rounded-pill x-small fw-bold px-3 py-1 bg-white hover-scale shadow-sm"
+                                                            onClick={() => setInputMessage(s)}
+                                                        >
+                                                            {s}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
 
                                             {/* Timestamp */}
                                             <div className={`text-end x-small mt-1 opacity-75 ${msg.type === 'user' ? 'text-white-50' : 'text-muted'}`}>
@@ -438,26 +525,27 @@ const GenAIHub = () => {
                                         </Button>
                                         {showAttachMenu && (
                                             <div className="position-absolute bottom-100 start-0 mb-3 bg-white rounded-4 shadow-xl p-2 d-flex flex-column gap-2 animate-pop-up border" style={{ width: '200px', zIndex: 1000 }}>
-                                                <Button variant="light" className="d-flex align-items-center gap-3 text-start small p-2 rounded-3 hover-bg-light border-0" onClick={() => fileInputRef.current.click()}>
+                                                <Button variant="light" className="d-flex align-items-center gap-3 text-start small p-2 rounded-3 hover-bg-light border-0" onClick={() => imageInputRef.current.click()}>
                                                     <div className="bg-primary bg-opacity-10 p-2 rounded-circle"><FaImage className="text-primary" /></div>
                                                     <div className="d-flex flex-column lh-sm">
-                                                        <span className="fw-bold">File / Photo</span>
-                                                        <span className="x-small text-muted">PDF, Docs, Images</span>
+                                                        <span className="fw-bold">Upload Image</span>
+                                                        <span className="x-small text-muted">JPG, PNG, WebP</span>
                                                     </div>
                                                 </Button>
-                                                <Button variant="light" className="d-flex align-items-center gap-3 text-start small p-2 rounded-3 hover-bg-light border-0" onClick={() => { setChecklistPrompt({ show: true, dest: '', days: 7 }); setShowAttachMenu(false); }}>
-                                                    <div className="bg-warning bg-opacity-10 p-2 rounded-circle"><FaSuitcase className="text-warning" /></div>
+                                                <Button variant="light" className="d-flex align-items-center gap-3 text-start small p-2 rounded-3 hover-bg-light border-0" onClick={() => docInputRef.current.click()}>
+                                                    <div className="bg-info bg-opacity-10 p-2 rounded-circle"><FaFilePdf className="text-info" /></div>
                                                     <div className="d-flex flex-column lh-sm">
-                                                        <span className="fw-bold">Packing List</span>
-                                                        <span className="x-small text-muted">Generate checklist</span>
+                                                        <span className="fw-bold">Upload PDF</span>
+                                                        <span className="x-small text-muted">Documents, Tickets</span>
                                                     </div>
                                                 </Button>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Hidden File Input (Accept ALL) */}
-                                    <input type="file" ref={fileInputRef} className="d-none" onChange={handleFileSelect} />
+                                    {/* Hidden File Inputs */}
+                                    <input type="file" ref={imageInputRef} className="d-none" accept="image/*" onChange={handleFileSelect} />
+                                    <input type="file" ref={docInputRef} className="d-none" accept=".pdf,.doc,.docx,.txt" onChange={handleFileSelect} />
 
                                     {/* Text Input */}
                                     <Form.Control
@@ -518,12 +606,6 @@ const GenAIHub = () => {
                             </Modal.Body>
                         </Modal>
                     </>
-                ) : activeSidebar === 'bookings' ? (
-                    <div className="p-4 overflow-auto w-100 flex-grow-1 bg-light bg-opacity-50">
-                        <Container>
-                            <TicketManager tripId={null} />
-                        </Container>
-                    </div>
                 ) : (
                     <div className="p-4 overflow-auto w-100 flex-grow-1 bg-light bg-opacity-55 animate-fade-in">
                         <Container className="max-w-2xl">
@@ -543,14 +625,19 @@ const GenAIHub = () => {
                                     conversations.map(conv => (
                                         <div
                                             key={conv.id}
-                                            className={`glass-card p-3 cursor-pointer hover-scale border-0 ${conversationId === conv.id ? 'border-start border-primary border-4' : ''}`}
+                                            className={`glass-card p-3 cursor-pointer hover-scale border-0 ${conversationId === conv.id ? 'border-start border-primary border-4 bg-primary bg-opacity-10' : ''}`}
                                             onClick={() => loadConversation(conv.id)}
                                         >
                                             <div className="d-flex justify-content-between align-items-start mb-1">
-                                                <h6 className="fw-bold mb-0 text-truncate" style={{ maxWidth: '80%' }}>{conv.title}</h6>
+                                                <h6 className="fw-bold mb-0 text-truncate" style={{ maxWidth: '75%' }}>{conv.title}</h6>
                                                 <small className="x-small text-muted">{new Date(conv.timestamp).toLocaleDateString()}</small>
                                             </div>
-                                            <p className="x-small text-muted mb-0 text-truncate">{conv.last_message}</p>
+                                            <div className="d-flex justify-content-between align-items-center">
+                                                <p className="x-small text-muted mb-0 text-truncate flex-grow-1" style={{ maxWidth: '65%' }}>{conv.last_message}</p>
+                                                <Button variant="outline-primary" size="sm" className="rounded-pill x-small py-0 px-2 fw-bold">
+                                                    {conversationId === conv.id ? 'Active' : 'Continue'}
+                                                </Button>
+                                            </div>
                                         </div>
                                     ))
                                 )}

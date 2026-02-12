@@ -14,12 +14,11 @@ logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint('chat', __name__)
 
-def run_async(coro):
-    return asyncio.run(coro)
+# run_async helper removed - using native Flask async support
 
 @chat_bp.route('/message', methods=['POST'])
 @jwt_required()
-def process_message():
+async def process_message():
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
@@ -34,12 +33,12 @@ def process_message():
         preferences = UserPreference.query.filter_by(user_id=user_id).first()
         preferences_dict = preferences.to_dict() if preferences else {}
         
-        # Unified AI response
-        result = run_async(ai_service.get_chat_response(
+        # Unified AI response - Direct await
+        result = await ai_service.get_chat_response(
             message=user_message,
             model=model_name,
             user_preferences=preferences_dict
-        ))
+        )
         
         # Save mood log
         try:
@@ -73,14 +72,14 @@ def process_message():
 
 @chat_bp.route('/generate-itinerary', methods=['POST'])
 @jwt_required()
-def generate_itinerary():
+async def generate_itinerary():
     try:
         data = request.get_json()
-        itinerary = run_async(ai_service.generate_itinerary(
+        itinerary = await ai_service.generate_itinerary(
             destination=data['destination'],
             days=int(data.get('duration', 1)),
             budget=data['budget']
-        ))
+        )
         return jsonify({'itinerary': itinerary}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

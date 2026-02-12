@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { toast } from 'react-toastify';
 import { FaMapMarkerAlt, FaSync } from 'react-icons/fa';
-import { Button, Spinner } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 
-const LocationTracker = ({ onUpdate }) => {
+const LocationTracker = ({ onUpdate, hideText = false }) => {
     const [location, setLocation] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState(null);
@@ -21,9 +20,7 @@ const LocationTracker = ({ onUpdate }) => {
                 console.warn('Reverse geocoding failed', err);
             }
 
-            await axios.post('/api/travel/user/location', { lat, lng, address }, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            await axios.post('/api/travel/user/location', { lat, lng, address });
 
             const newLoc = { lat, lng, address };
             setLocation(newLoc);
@@ -32,8 +29,7 @@ const LocationTracker = ({ onUpdate }) => {
         } catch (err) {
             console.error('Failed to update location', err);
             const errorMsg = err.response?.data?.error || err.message;
-            setError(`Server error: ${errorMsg}`);
-            toast.error(`Location update failed: ${errorMsg}`);
+            setError(`Sync error: ${errorMsg}`);
         } finally {
             setIsUpdating(false);
         }
@@ -41,7 +37,7 @@ const LocationTracker = ({ onUpdate }) => {
 
     const requestLocation = useCallback(() => {
         if (!navigator.geolocation) {
-            setError("Geolocation is not supported by your browser");
+            setError("Geolocation not supported");
             return;
         }
 
@@ -52,51 +48,51 @@ const LocationTracker = ({ onUpdate }) => {
                 updateLocation(latitude, longitude);
             },
             (err) => {
-                let msg = "Location permission denied or timed out";
-                if (err.code === 1) msg = "Please enable location permissions in your browser";
-                if (err.code === 2) msg = "Location unavailable";
+                let msg = "Location lookup failed";
+                if (err.code === 1) msg = "Location access denied";
+                if (err.code === 2) msg = "Location signal lost";
                 if (err.code === 3) msg = "Location request timed out";
 
                 setError(msg);
                 setIsUpdating(false);
             },
-            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
         );
     }, [updateLocation]);
 
     useEffect(() => {
-        // Initial request on mount only
         requestLocation();
-
-        // Auto-update every 10 minutes
-        const intervalId = setInterval(requestLocation, 600000);
+        const intervalId = setInterval(requestLocation, 600000); // 10 mins
         return () => clearInterval(intervalId);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [requestLocation]);
 
     return (
         <div className="location-tracker-status d-flex align-items-center small text-muted">
-            <FaMapMarkerAlt className={`me-2 ${location ? 'text-success' : 'text-danger'}`} />
-            {isUpdating ? (
-                <span><Spinner size="sm" animation="border" className="me-1" /> Updating...</span>
-            ) : location ? (
-                <span className="text-truncate" style={{ maxWidth: '250px' }}>
-                    {location.address || `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`}
-                </span>
-            ) : error ? (
-                <span className="text-danger">Location error: {error}</span>
-            ) : (
-                <span>Location Off</span>
-            )}
-            <Button
-                variant="link"
-                size="sm"
-                className="ms-2 p-0 text-muted"
-                onClick={requestLocation}
-                disabled={isUpdating}
-            >
-                <FaSync className={isUpdating ? 'spin' : ''} />
-            </Button>
+            <div className="d-flex align-items-center bg-light bg-opacity-50 px-3 py-1 rounded-pill border">
+                <FaMapMarkerAlt className={`me-2 ${location ? 'text-success' : 'text-warning'}`} size={12} />
+                {isUpdating ? (
+                    <span className="x-small fw-bold">Locating...</span>
+                ) : !hideText && location ? (
+                    <span className="text-truncate x-small fw-bold text-dark" style={{ maxWidth: '150px' }}>
+                        {location.address || `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`}
+                    </span>
+                ) : !hideText && error ? (
+                    <span className="text-danger x-small fw-bold">{error}</span>
+                ) : !hideText ? (
+                    <span className="x-small fw-bold">Live Tracking</span>
+                ) : null}
+
+                <Button
+                    variant="link"
+                    size="sm"
+                    className="ms-1 p-0 text-muted lh-1"
+                    onClick={requestLocation}
+                    disabled={isUpdating}
+                    style={{ fontSize: '10px' }}
+                >
+                    <FaSync className={isUpdating ? 'spin' : ''} />
+                </Button>
+            </div>
         </div>
     );
 };
