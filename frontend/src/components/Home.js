@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
-import { LinkContainer } from 'react-router-bootstrap';
+import { Link } from 'react-router-dom';
 import { FaCompass, FaMapMarkedAlt, FaMagic, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
@@ -34,29 +34,21 @@ const Home = () => {
                         <div className="d-flex justify-content-center gap-4">
                             {user ? (
                                 <>
-                                    <LinkContainer to="/dashboard">
-                                        <Button size="lg" className="px-5 py-3 rounded-pill border-0 fw-black shadow-lg" style={{ background: '#f97316', color: '#ffffff', fontSize: '1.2rem' }}>
-                                            GO TO DASHBOARD <FaArrowRight className="ms-2" />
-                                        </Button>
-                                    </LinkContainer>
-                                    <LinkContainer to={{ pathname: "/ai", search: "?intent=plan" }}>
-                                        <Button size="lg" variant="light" className="px-5 py-3 rounded-pill fw-black shadow-lg" style={{ backgroundColor: '#ffffff', color: '#000000', border: 'none' }}>
-                                            PLAN NEW TRIP
-                                        </Button>
-                                    </LinkContainer>
+                                    <Button as={Link} to="/dashboard" size="lg" className="px-5 py-3 rounded-pill border-0 fw-black shadow-lg" style={{ background: '#f97316', color: '#ffffff', fontSize: '1.2rem' }}>
+                                        GO TO DASHBOARD <FaArrowRight className="ms-2" />
+                                    </Button>
+                                    <Button as={Link} to={{ pathname: "/ai", search: "?intent=plan" }} size="lg" variant="light" className="px-5 py-3 rounded-pill fw-black shadow-lg" style={{ backgroundColor: '#ffffff', color: '#000000', border: 'none' }}>
+                                        PLAN NEW TRIP
+                                    </Button>
                                 </>
                             ) : (
                                 <>
-                                    <LinkContainer to="/register">
-                                        <Button size="lg" className="px-5 py-3 rounded-pill border-0 fw-black shadow-lg" style={{ background: '#f97316', color: '#ffffff', fontSize: '1.2rem' }}>
-                                            START EXPLORING <FaArrowRight className="ms-2" />
-                                        </Button>
-                                    </LinkContainer>
-                                    <LinkContainer to="/login">
-                                        <Button size="lg" variant="light" className="px-5 py-3 rounded-pill fw-black shadow-lg" style={{ backgroundColor: '#ffffff', color: '#000000', border: 'none' }}>
-                                            SIGN IN
-                                        </Button>
-                                    </LinkContainer>
+                                    <Button as={Link} to="/register" size="lg" className="px-5 py-3 rounded-pill border-0 fw-black shadow-lg" style={{ background: '#f97316', color: '#ffffff', fontSize: '1.2rem' }}>
+                                        START EXPLORING <FaArrowRight className="ms-2" />
+                                    </Button>
+                                    <Button as={Link} to="/login" size="lg" variant="light" className="px-5 py-3 rounded-pill fw-black shadow-lg" style={{ backgroundColor: '#ffffff', color: '#000000', border: 'none' }}>
+                                        SIGN IN
+                                    </Button>
                                 </>
                             )}
                         </div>
@@ -116,11 +108,9 @@ const Home = () => {
                                     Join thousands of explorers using RoamIQ to turn their dream vacations into reality.
                                     No more spreadsheets, just smart travel.
                                 </p>
-                                <LinkContainer to={user ? "/dashboard" : "/register"}>
-                                    <Button size="lg" className="btn-gradient px-5 py-3 rounded-pill border-0 fw-bold">
-                                        {user ? "Go to Dashboard" : "Create Free Account"}
-                                    </Button>
-                                </LinkContainer>
+                                <Button as={Link} to={user ? "/dashboard" : "/register"} size="lg" className="btn-gradient px-5 py-3 rounded-pill border-0 fw-bold">
+                                    {user ? "Go to Dashboard" : "Create Free Account"}
+                                </Button>
                             </Col>
                             <Col lg={6}>
                                 <img

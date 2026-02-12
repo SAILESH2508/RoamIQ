@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar as BootstrapNavbar, Nav, Container, NavDropdown } from 'react-bootstrap';
-import { LinkContainer } from 'react-router-bootstrap';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { FaRobot, FaTachometerAlt, FaGlobe, FaChevronDown, FaTicketAlt, FaSync } from 'react-icons/fa';
@@ -39,33 +39,25 @@ const Navbar = () => {
           <Nav className="mx-auto nav-pill-central mt-3 mt-lg-0">
             {user ? (
               <>
-                <LinkContainer to="/">
-                  <Nav.Link className="nav-link-premium">
-                    <FaRobot />
-                    Home
-                  </Nav.Link>
-                </LinkContainer>
+                <Nav.Link as={Link} to="/" className="nav-link-premium">
+                  <FaRobot />
+                  Home
+                </Nav.Link>
 
-                <LinkContainer to="/dashboard">
-                  <Nav.Link className="nav-link-premium">
-                    <FaTachometerAlt />
-                    Dashboard
-                  </Nav.Link>
-                </LinkContainer>
+                <Nav.Link as={Link} to="/dashboard" className="nav-link-premium">
+                  <FaTachometerAlt />
+                  Dashboard
+                </Nav.Link>
 
-                <LinkContainer to="/ai">
-                  <Nav.Link className="nav-link-premium">
-                    <FaRobot />
-                    AI Hub
-                  </Nav.Link>
-                </LinkContainer>
+                <Nav.Link as={Link} to="/ai" className="nav-link-premium">
+                  <FaRobot />
+                  AI Hub
+                </Nav.Link>
 
-                <LinkContainer to={{ pathname: '/dashboard', search: '?tab=bookings' }}>
-                  <Nav.Link className="nav-link-premium">
-                    <FaTicketAlt />
-                    Bookings
-                  </Nav.Link>
-                </LinkContainer>
+                <Nav.Link as={Link} to="/dashboard?tab=bookings" className="nav-link-premium">
+                  <FaTicketAlt />
+                  Bookings
+                </Nav.Link>
 
                 <Nav.Link
                   className="nav-link-premium"
@@ -77,12 +69,10 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <LinkContainer to="/">
-                  <Nav.Link className="nav-link-premium">
-                    <FaRobot />
-                    Home
-                  </Nav.Link>
-                </LinkContainer>
+                <Nav.Link as={Link} to="/" className="nav-link-premium">
+                  <FaRobot />
+                  Home
+                </Nav.Link>
                 <Nav.Link href="#features" className="nav-link-premium">Features</Nav.Link>
               </>
             )}
@@ -132,23 +122,17 @@ const Navbar = () => {
                 align="end"
                 className="no-caret"
               >
-                <LinkContainer to="/profile">
-                  <NavDropdown.Item className="small py-2 fw-bold">PROFILE</NavDropdown.Item>
-                </LinkContainer>
+                <NavDropdown.Item as={Link} to="/profile" className="small py-2 fw-bold">PROFILE</NavDropdown.Item>
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={logout} className="text-danger small py-2 fw-bold">SIGN OUT</NavDropdown.Item>
               </NavDropdown>
             </Nav>
           ) : (
             <Nav className="ms-auto gap-3">
-              <LinkContainer to="/login">
-                <Nav.Link className="nav-link-premium border-0 p-0 text-dark">Log In</Nav.Link>
-              </LinkContainer>
-              <LinkContainer to="/register">
-                <Nav.Link className="btn-gradient text-white rounded-pill px-4 fw-bold shadow-sm">
-                  Get Started
-                </Nav.Link>
-              </LinkContainer>
+              <Nav.Link as={Link} to="/login" className="nav-link-premium border-0 p-0 text-dark">Log In</Nav.Link>
+              <Nav.Link as={Link} to="/register" className="btn-gradient text-white rounded-pill px-4 fw-bold shadow-sm">
+                Get Started
+              </Nav.Link>
             </Nav>
           )}
         </BootstrapNavbar.Collapse>
