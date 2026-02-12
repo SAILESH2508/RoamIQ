@@ -33,7 +33,6 @@
     "nprogress": "^0.2.0",
     "prismjs": "^1.29.0",
     "react": "^18.2.0",
-    "react-audio-recorder": "^2.2.0",
     "react-bootstrap": "^2.7.0",
     "react-chartjs-2": "^5.2.0",
     "react-datepicker": "^4.25.0",
