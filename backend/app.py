@@ -26,30 +26,53 @@ def create_app():
     setup_logging(app)
     
     # Database Configuration
-    # prioritizing environment variable (for production like Render/Postgres)
     database_url = os.getenv('DATABASE_URL')
     
+    # Normalize Postgres URL if present (Render/Heroku style)
     if database_url and database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
         
     if database_url:
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.logger.info("Using Production Database URL")
+        app.logger.info("Using Database URL from environment")
+        
+        # If it's a local sqlite URL, ensure the directory exists
+        if database_url.startswith("sqlite:///"):
+            db_file_path = database_url.replace("sqlite:///", "")
+            if not os.path.isabs(db_file_path):
+                # Convert relative to absolute based on project root
+                from pathlib import Path
+                project_root = Path(__file__).resolve().parent.parent
+                db_file_path = project_root / db_file_path
+            
+            os.makedirs(os.path.dirname(db_file_path), exist_ok=True)
     else:
-        # Fallback to local SQLite
+        # Fallback to standard local SQLite with absolute path
         from pathlib import Path
         project_root = Path(__file__).resolve().parent.parent
-        db_path = project_root / 'instance' / 'roamiq.db'
+        db_dir = project_root / 'instance'
+        db_path = db_dir / 'roamiq.db'
         
-        # SQLite on Windows needs special care with absolute paths (all forward slashes)
+        db_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Standard SQLite absolute path for Windows (3 slashes)
+        # Format: sqlite:///D:/path/to/db
         db_uri = f"sqlite:///{db_path.as_posix()}"
         app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-        app.logger.info(f"Using Local SQLite Database: {db_uri}")
+        app.logger.info(f"Using Fallback SQLite Database: {db_uri}")
+        print(f"DATABASE_URI: {db_uri}") # Debug print to console
     
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'roamiq-secret-key')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+    
+    # SQLite Specific optimization to avoid locking
+    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            "connect_args": {"timeout": 30},
+            "pool_pre_ping": True
+        }
     
     # Initialize extensions
     from backend.extensions import db, jwt, cors
@@ -57,8 +80,7 @@ def create_app():
     jwt.init_app(app)
     cors.init_app(app)
     
-    # Create instance directory
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+
     
     # Register blueprints
     with app.app_context():
