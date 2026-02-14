@@ -18,7 +18,7 @@ services:
     autoDeploy: false
 
   # 2. Frontend Service (React Static Site)
-  - type: static
+  - type: web
     name: roamiq-frontend
     env: static
     region: ohio
