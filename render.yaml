@@ -17,18 +17,17 @@ services:
         value: backend.app:app
     autoDeploy: false
 
-  # 2. Frontend Service (React Static Site)
+  # 2. Frontend Service (React App via Node.js)
   - type: web
     name: roamiq-frontend
-    env: static
+    env: node
+    region: ohio
     plan: free
     repo: https://github.com/SAILESH2508/RoamIQ
-    # Root directory for frontend build context
     rootDir: frontend
-    # Build command: Install dependencies and build
     buildCommand: npm install && npm run build
-    # Where the build artifacts live
-    staticPublishPath: ./build
+    startCommand: npx serve -s build -l $PORT
+
     envVars:
       - key: NODE_VERSION
         value: 18.17.0
