@@ -54,11 +54,11 @@ class Ticket(db.Model):
             'confirmation_number': self.confirmation_number,
             'price': self.price,
             'currency': self.currency,
-            'booking_date': self.booking_date.isoformat() if self.booking_date else None,
-            'valid_from': self.valid_from.isoformat() if self.valid_from else None,
-            'valid_until': self.valid_until.isoformat() if self.valid_until else None,
+            'booking_date': self.booking_date.isoformat() + 'Z' if self.booking_date else None,
+            'valid_from': self.valid_from.isoformat() + 'Z' if self.valid_from else None,
+            'valid_until': self.valid_until.isoformat() + 'Z' if self.valid_until else None,
             'status': self.status,
             'additional_info': self.get_additional_info(),
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z',
+            'updated_at': self.updated_at.isoformat() + 'Z'
         }

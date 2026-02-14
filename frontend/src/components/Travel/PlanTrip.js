@@ -5,9 +5,11 @@ import { FaPaperPlane, FaSuitcase } from 'react-icons/fa';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 const PlanTrip = () => {
     const navigate = useNavigate();
+    const { currentCurrency } = useCurrency();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
@@ -28,7 +30,7 @@ const PlanTrip = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const response = await axios.post('/api/travel/trips', formData);
+            const response = await axios.post('/api/travel/trips', { ...formData, currency: currentCurrency });
             toast.success("AI is orchestrating your trip...");
             navigate(`/trips/${response.data.trip.id}`);
         } catch (error) {

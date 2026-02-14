@@ -81,6 +81,6 @@ class UserPreference(db.Model):
             'languages_spoken': self.get_languages_spoken(),
             'accessibility_needs': self.get_accessibility_needs(),
             'sustainability_priority': self.sustainability_priority,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z',
+            'updated_at': self.updated_at.isoformat() + 'Z'
         }

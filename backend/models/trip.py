@@ -14,6 +14,8 @@ class Trip(db.Model):
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     duration_days = db.Column(db.Integer)
+    lat = db.Column(db.Float)
+    lng = db.Column(db.Float)
     
     # Trip Details
     budget = db.Column(db.Float)
@@ -77,6 +79,8 @@ class Trip(db.Model):
             'start_date': self.start_date.isoformat() if self.start_date else None,
             'end_date': self.end_date.isoformat() if self.end_date else None,
             'duration_days': self.duration_days,
+            'lat': self.lat,
+            'lng': self.lng,
             'budget': self.budget,
             'actual_cost': self.actual_cost,
             'group_size': self.group_size,
@@ -88,6 +92,6 @@ class Trip(db.Model):
             'notes': self.notes,
             'sustainability_score': self.sustainability_score,
             'safety_alerts': self.get_safety_alerts(),
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z',
+            'updated_at': self.updated_at.isoformat() + 'Z'
         }

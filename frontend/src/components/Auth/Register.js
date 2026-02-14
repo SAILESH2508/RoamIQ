@@ -50,7 +50,7 @@ const Register = () => {
     const result = await register(registrationData);
 
     if (result.success) {
-      navigate('/dashboard');
+      navigate('/');
     } else {
       setError(result.error);
     }

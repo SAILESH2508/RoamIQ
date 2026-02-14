@@ -3,8 +3,8 @@ import { Row, Col, Card, Button, Badge } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  FaComments, FaMapMarkedAlt, FaCalendar, FaCoins, FaUsers,
-  FaHome, FaSuitcase, FaChartBar, FaGlobe, FaChevronRight, FaMapMarkerAlt
+  FaMapMarkedAlt, FaCalendar, FaCoins, FaUsers,
+  FaHome, FaSuitcase, FaChartBar, FaGlobe, FaMapMarkerAlt, FaTrash
 } from 'react-icons/fa';
 import axios from 'axios';
 import { useCurrency } from '../../contexts/CurrencyContext';
@@ -57,6 +57,23 @@ const Dashboard = () => {
     }
   }, []);
 
+  const handleDeleteTrip = async (id, e) => {
+    if (e) e.preventDefault();
+    if (e) e.stopPropagation();
+
+    if (!window.confirm("Are you sure you want to delete this trip? All expenses and tickets for this trip will be removed.")) return;
+
+    try {
+      await axios.delete(`/api/travel/trips/${id}`);
+      setTrips(prev => prev.filter(t => t.id !== id));
+      // Refresh stats
+      fetchTrips();
+    } catch (error) {
+      console.error('Error deleting trip:', error);
+      alert("Failed to delete trip.");
+    }
+  };
+
   useEffect(() => {
     fetchTrips();
     // Initialize location from user profile if available
@@ -99,7 +116,7 @@ const Dashboard = () => {
       {/* Sidebar Navigation */}
       <aside className="sidebar-nav">
         <div className="px-3 mb-4">
-          <h5 className="fw-bold gradients-text mb-0">RoamIQ Menu</h5>
+          <h5 className="fw-bold gradients-text mb-0">RoamIQ Dashboard</h5>
           <small className="text-muted">Personal Travel Command</small>
         </div>
 
@@ -122,17 +139,31 @@ const Dashboard = () => {
           <FaChartBar size={18} /> Expenses
         </button>
 
+
+
         <div className="mt-auto px-3 pb-4">
-          <Link to="/ai" className="text-decoration-none">
-            <Button variant="warning" className="w-100 rounded-pill text-white fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2 py-2">
-              <FaComments /> AI Assistant
-            </Button>
-          </Link>
-          <Link to={{ pathname: "/ai", search: "?intent=plan" }} className="text-decoration-none mt-2 d-block">
-            <Button variant="outline-warning" className="w-100 rounded-pill fw-bold py-2">
-              + Plan Trip
-            </Button>
-          </Link>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <small className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.7rem' }}>Quick Recap</small>
+            <button onClick={() => setActiveTab('trips')} className="btn btn-link text-warning text-decoration-none p-0 fw-bold" style={{ fontSize: '0.7rem' }}>View All</button>
+          </div>
+          <div className="d-flex flex-column gap-3">
+            {trips.slice(0, 2).map((trip) => (
+              <Link to={`/trips/${trip.id}`} className="text-decoration-none" key={trip.id}>
+                <div className="bg-white border rounded-3 p-3 shadow-sm hover-scale transition-all">
+                  <div className="d-flex justify-content-between align-items-start mb-1">
+                    <h6 className="fw-bold text-dark mb-0 text-truncate w-75" style={{ fontSize: '0.9rem' }}>{trip.title}</h6>
+                    <Badge bg={getStatusBadge(trip.status)} style={{ fontSize: '0.6rem' }}>{trip.status}</Badge>
+                  </div>
+                  <div className="small text-muted d-flex align-items-center">
+                    <FaCalendar size={10} className="me-1" /> {formatDate(trip.start_date)}
+                  </div>
+                </div>
+              </Link>
+            ))}
+            {trips.length === 0 && (
+              <div className="text-center text-muted small py-2">No recent trips</div>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -207,39 +238,7 @@ const Dashboard = () => {
                 </Col>
               </Row>
 
-              {/* Recent Actions / Info */}
-              <Row className="g-4">
-                <Col lg={8}>
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h5 className="fw-bold mb-0">Quick Recap</h5>
-                    <button onClick={() => setActiveTab('trips')} className="btn btn-link text-warning text-decoration-none p-0 fw-bold small">Explore All <FaChevronRight size={10} /></button>
-                  </div>
-                  <Row className="g-3">
-                    {trips.slice(0, 2).map((trip) => (
-                      <Col md={6} key={trip.id}>
-                        <Link to={`/trips/${trip.id}`} className="text-decoration-none">
-                          <Card className="trip-card border-0 shadow-sm p-3 h-100" style={{ borderRadius: '18px' }}>
-                            <Badge bg={getStatusBadge(trip.status)} className="mb-2 align-self-start">{trip.status}</Badge>
-                            <h6 className="fw-bold text-dark mb-1">{trip.title}</h6>
-                            <div className="small text-muted mb-0"><FaCalendar size={12} className="me-1" /> {formatDate(trip.start_date)}</div>
-                          </Card>
-                        </Link>
-                      </Col>
-                    ))}
-                  </Row>
-                </Col>
-                <Col lg={4}>
-                  <Card className="glass-card border-0 p-4 h-100" style={{ background: 'linear-gradient(135deg, #FF9D6C 0%, #BB4E75 100%)', color: 'white' }}>
-                    <h6 className="fw-bold mb-3">AI Insight</h6>
-                    <p className="small opacity-90 mb-4">
-                      You have {stats.upcomingTrips} trips coming up. Don't forget to check your packing list for {trips[0]?.destination || 'your next destination'}!
-                    </p>
-                    <Link to="/ai">
-                      <Button variant="light" size="sm" className="w-100 rounded-pill fw-bold">Open Assistant</Button>
-                    </Link>
-                  </Card>
-                </Col>
-              </Row>
+
             </motion.div>
           )}
 
@@ -269,9 +268,16 @@ const Dashboard = () => {
                 ) : trips.map((trip) => (
                   <Col md={6} lg={4} key={trip.id}>
                     <Link to={`/trips/${trip.id}`} className="text-decoration-none">
-                      <Card className="trip-card border-0 shadow-lg h-100" style={{ borderRadius: '25px' }}>
+                      <Card className="trip-card border-0 shadow-lg h-100 position-relative" style={{ borderRadius: '25px' }}>
                         <div className="p-4 bg-orange-soft bg-opacity-10 text-center text-warning rounded-top-4">
                           <FaSuitcase size={40} />
+                          <Button
+                            variant="link"
+                            className="position-absolute top-0 end-0 m-3 text-danger p-0 border-0 hover-scale"
+                            onClick={(e) => handleDeleteTrip(trip.id, e)}
+                          >
+                            <FaTrash size={16} />
+                          </Button>
                         </div>
                         <Card.Body className="p-4">
                           <Badge bg={getStatusBadge(trip.status)} className="mb-2">{trip.status}</Badge>

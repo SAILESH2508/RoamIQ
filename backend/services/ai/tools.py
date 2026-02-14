@@ -15,7 +15,6 @@ def create_trip(user_id: int, destination: str, title: str, start_date: str, end
     Dates must be in ISO format (YYYY-MM-DD).
     """
     try:
-        from datetime import datetime
         s_date = datetime.strptime(start_date, '%Y-%m-%d').date()
         e_date = datetime.strptime(end_date, '%Y-%m-%d').date()
         
@@ -34,6 +33,19 @@ def create_trip(user_id: int, destination: str, title: str, start_date: str, end
         return {"success": True, "trip": new_trip.to_dict()}
     except Exception as e:
         logger.error(f"Error creating trip: {e}")
+        return {"success": False, "error": str(e)}
+
+def delete_trip(user_id: int, trip_id: int) -> Dict[str, Any]:
+    """Delete a specific trip by its ID."""
+    try:
+        trip = Trip.query.filter_by(id=trip_id, user_id=user_id).first()
+        if not trip:
+            return {"success": False, "error": "Trip not found"}
+        db.session.delete(trip)
+        db.session.commit()
+        return {"success": True, "message": "Trip deleted successfully"}
+    except Exception as e:
+        db.session.rollback()
         return {"success": False, "error": str(e)}
 
 def add_ticket(user_id: int, trip_id: Optional[int], ticket_type: str, title: str, price: float = 0.0, confirmation_number: str = "") -> Dict[str, Any]:
@@ -133,6 +145,7 @@ def generate_trip_report(user_id: int, trip_id: int) -> Dict[str, Any]:
 # Map tools for the LLM
 AVAILABLE_TOOLS = {
     "create_trip": create_trip,
+    "delete_trip": delete_trip,
     "add_ticket": add_ticket,
     "add_expense": add_expense,
     "get_user_trips": get_user_trips,
@@ -155,6 +168,17 @@ TOOL_DECLARATIONS = [
                 "budget": {"type": "number", "description": "Estimated budget amount"}
             },
             "required": ["destination", "title", "start_date", "end_date"]
+        }
+    },
+    {
+        "name": "delete_trip",
+        "description": "Remove a trip from the system using its ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "trip_id": {"type": "integer", "description": "The ID of the trip to delete"}
+            },
+            "required": ["trip_id"]
         }
     },
     {

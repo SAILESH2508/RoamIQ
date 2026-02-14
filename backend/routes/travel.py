@@ -10,11 +10,12 @@ from backend.services.ai_service import AIService
 from datetime import datetime, date
 import json
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
 travel_bp = Blueprint('travel', __name__)
-ai_service = AIService()
+from backend.services.ai_service import ai_service
 
 @travel_bp.route('/preferences', methods=['GET'])
 @jwt_required()
@@ -223,7 +224,7 @@ def update_location():
 
 @travel_bp.route('/trips', methods=['POST'])
 @jwt_required()
-def create_trip():
+async def create_trip():
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
@@ -245,11 +246,23 @@ def create_trip():
             notes=data.get('notes', '')
         )
         
-        # Parse dates if provided
         if data.get('start_date'):
             trip.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         if data.get('end_date'):
             trip.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+            
+        # Geocode destination for the map
+        try:
+            # Use Nominatim for free geocoding
+            geo_url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(trip.destination)}&limit=1"
+            geo_res = requests.get(geo_url, headers={'User-Agent': 'RoamIQ/1.0'}, timeout=5)
+            if geo_res.status_code == 200 and geo_res.json():
+                loc = geo_res.json()[0]
+                trip.lat = float(loc['lat'])
+                trip.lng = float(loc['lon'])
+                logger.info(f"Geocoded '{trip.destination}' to {trip.lat}, {trip.lng}")
+        except Exception as ge:
+            logger.warning(f"Failed to geocode destination '{trip.destination}': {ge}")
         
         # Calculate duration
         trip.calculate_duration()
@@ -257,11 +270,12 @@ def create_trip():
         # Generate initial itinerary if budget and duration are provided
         if trip.budget and trip.duration_days:
             preferences = UserPreference.query.filter_by(user_id=user_id).first()
-            itinerary = ai_service.generate_itinerary(
+            itinerary = await ai_service.generate_itinerary(
                 trip.destination,
                 trip.duration_days,
                 trip.budget,
-                preferences.to_dict() if preferences else None
+                preferences.to_dict() if preferences else None,
+                currency=data.get('currency', 'USD')
             )
             trip.set_itinerary(itinerary)
         
@@ -585,7 +599,7 @@ def delete_packing_item(item_id):
         return jsonify({'error': str(e)}), 500
 @travel_bp.route('/packing-list/generate', methods=['POST'])
 @jwt_required()
-def generate_packing_list_ai():
+async def generate_packing_list_ai():
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
@@ -598,7 +612,7 @@ def generate_packing_list_ai():
             return jsonify({'error': 'Destination is required'}), 400
 
         # Generate list using AI Service
-        packing_list = ai_service.generate_packing_list(destination, duration, activities)
+        packing_list = await ai_service.generate_packing_list(destination, duration, activities)
         
         return jsonify({'packing_list': packing_list}), 200
         

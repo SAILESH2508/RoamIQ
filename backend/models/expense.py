@@ -26,6 +26,6 @@ class Expense(db.Model):
             'currency': self.currency,
             'category': self.category,
             'description': self.description,
-            'date': self.date.isoformat(),
-            'created_at': self.created_at.isoformat()
+            'date': self.date.isoformat() + 'Z',
+            'created_at': self.created_at.isoformat() + 'Z'
         }

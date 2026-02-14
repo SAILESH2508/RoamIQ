@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Container, Button, Form, Modal, Spinner, Badge } from 'react-bootstrap';
 import {
-    FaRobot, FaPaperPlane, FaMicrophone, FaStop, FaPlus,
+    FaRobot, FaPaperPlane, FaMicrophone, FaStop, FaPlus, FaTrash,
     FaImage, FaSuitcase, FaTimes, FaUser, FaMapMarkedAlt, FaSync, FaFilePdf
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
@@ -10,6 +10,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import ReactMarkdown from 'react-markdown';
 import { v4 as uuidv4 } from 'uuid';
+import { useCurrency } from '../../contexts/CurrencyContext';
 import './GenAIHub.css';
 
 const GenAIHub = () => {
@@ -36,6 +37,8 @@ const GenAIHub = () => {
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
+
+    const { currentCurrency } = useCurrency();
 
     const messagesEndRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -106,6 +109,35 @@ const GenAIHub = () => {
             setIsLoading(false);
         }
     }, []);
+
+    const deleteConversation = React.useCallback(async (id, e) => {
+        if (e) e.stopPropagation(); // Don't trigger 'loadConversation'
+
+        if (!window.confirm("Are you sure you want to delete this conversation?")) return;
+
+        try {
+            await axios.delete(`/api/ai/chat/conversations/${id}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+
+            setConversations(prev => prev.filter(c => c.id !== id));
+            toast.success("Conversation deleted");
+
+            // If we deleted the currently active conversation, start a new one
+            if (id === conversationId) {
+                setConversationId(uuidv4());
+                setMessages([{
+                    id: 'welcome',
+                    type: 'ai',
+                    content: "Hi! I'm RoamIQ. 🌍\n\nI can plan trips, see landmarks, or listen to your ideas. \n\nTap **+** to upload photos or generate packing lists!",
+                    timestamp: new Date()
+                }]);
+            }
+        } catch (err) {
+            console.error("Failed to delete conversation", err);
+            toast.error("Failed to delete conversation");
+        }
+    }, [conversationId]);
 
     const location = useLocation();
 
@@ -229,7 +261,8 @@ const GenAIHub = () => {
             const res = await axios.post('/api/ai/chat', {
                 message: currentMsg,
                 model: 'gemini-2.0-flash-lite',
-                conversation_id: conversationId
+                conversation_id: conversationId,
+                currency: currentCurrency
             }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
 
             addMessage(res.data.ai_response.trim(), 'ai', {
@@ -240,7 +273,7 @@ const GenAIHub = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [inputMessage, selectedFile, conversationId, addMessage]);
+    }, [inputMessage, selectedFile, conversationId, addMessage, currentCurrency]);
 
     // 1. File Handling (Universal)
     const handleFileSelect = (e) => {
@@ -318,7 +351,8 @@ const GenAIHub = () => {
         try {
             const res = await axios.post('/api/ai/generate/packing-list', {
                 destination: checkListPrompt.dest,
-                duration: checkListPrompt.days
+                duration: checkListPrompt.days,
+                currency: currentCurrency
             }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
 
             addMessage("Here's your packing list!", 'ai', { packingList: res.data });
@@ -327,7 +361,7 @@ const GenAIHub = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [checkListPrompt, addMessage]);
+    }, [checkListPrompt, addMessage, currentCurrency]);
 
     // --- Renders ---
 
@@ -633,9 +667,19 @@ const GenAIHub = () => {
                                             </div>
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <p className="x-small text-muted mb-0 text-truncate flex-grow-1" style={{ maxWidth: '65%' }}>{conv.last_message}</p>
-                                                <Button variant="outline-primary" size="sm" className="rounded-pill x-small py-0 px-2 fw-bold">
-                                                    {conversationId === conv.id ? 'Active' : 'Continue'}
-                                                </Button>
+                                                <div className="d-flex gap-2 align-items-center">
+                                                    <Button
+                                                        variant="link"
+                                                        className="text-danger p-0 border-0 hover-scale"
+                                                        onClick={(e) => deleteConversation(conv.id, e)}
+                                                        title="Delete Conversation"
+                                                    >
+                                                        <FaTrash size={14} />
+                                                    </Button>
+                                                    <Button variant="outline-primary" size="sm" className="rounded-pill x-small py-0 px-2 fw-bold">
+                                                        {conversationId === conv.id ? 'Active' : 'Continue'}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))

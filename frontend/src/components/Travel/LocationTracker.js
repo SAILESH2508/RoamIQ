@@ -14,13 +14,20 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
             // Reverse geocode to get street name/address
             let address = 'Unknown Location';
             try {
-                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                // Nominatim requires a User-Agent or it might return 403
+                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+                    headers: { 'User-Agent': 'RoamIQ/1.0' }
+                });
                 address = geoRes.data.display_name;
             } catch (err) {
                 console.warn('Reverse geocoding failed', err);
             }
 
-            await axios.post('/api/travel/user/location', { lat, lng, address });
+            const token = localStorage.getItem('token');
+            await axios.post('/api/travel/user/location',
+                { lat, lng, address },
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
 
             const newLoc = { lat, lng, address };
             setLocation(newLoc);
@@ -49,14 +56,14 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
             },
             (err) => {
                 let msg = "Location lookup failed";
-                if (err.code === 1) msg = "Location access denied";
+                if (err.code === 1) msg = "Access denied. Check Windows Settings > Privacy > Location.";
                 if (err.code === 2) msg = "Location signal lost";
                 if (err.code === 3) msg = "Location request timed out";
 
                 setError(msg);
                 setIsUpdating(false);
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
         );
     }, [updateLocation]);
 

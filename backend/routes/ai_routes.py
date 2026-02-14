@@ -2,9 +2,8 @@
 Async-compatible AI Routes for RoamIQ
 Uses the redesigned modular AI service
 """
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-import asyncio
 import logging
 from datetime import datetime
 
@@ -46,6 +45,7 @@ async def chat_with_ai():
         message = data['message']
         model = data.get('model', 'gemini-1.5-flash')
         conversation_id = data.get('conversation_id')
+        currency = data.get('currency', 'USD')
         
         # Get user identity and resolve to ID
         user_identity = get_jwt_identity()
@@ -56,14 +56,17 @@ async def chat_with_ai():
             message=message,
             model=model,
             conversation_id=conversation_id,
-            user_id=user_id
+            user_id=user_id,
+            currency=currency
         )
         
         return jsonify(result)
     
     except Exception as e:
-        logger.error(f"Chat route error: {e}")
-        return jsonify({'error': 'Failed to generate AI response'}), 500
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Chat route error: {str(e)}")
+        return jsonify({'error': 'Failed to generate AI response', 'details': str(e)}), 500
 
 @ai_bp.route('/chat/history/<conversation_id>', methods=['GET'])
 @jwt_required()
@@ -137,13 +140,43 @@ def get_conversations():
                 'id': conv.conversation_id,
                 'title': title,
                 'last_message': conv.content[:60] + "..." if len(conv.content) > 60 else conv.content,
-                'timestamp': conv.timestamp.isoformat()
+                'timestamp': conv.timestamp.isoformat() + "Z"
             })
             
         return jsonify(results)
     except Exception as e:
         logger.error(f"Error listing conversations: {e}")
         return jsonify({'error': 'Failed to list conversations'}), 500
+
+@ai_bp.route('/chat/conversations/<conversation_id>', methods=['DELETE'])
+@jwt_required()
+@api_error_handler
+def delete_conversation(conversation_id):
+    """Delete all messages associated with a conversation."""
+    try:
+        from backend.models.chat_message import ChatMessage
+        from backend.extensions import db
+        user_identity = get_jwt_identity()
+        user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
+        
+        # Delete all messages for this user and conversation
+        deleted_count = ChatMessage.query.filter_by(
+            conversation_id=conversation_id,
+            user_id=user_id
+        ).delete()
+        
+        db.session.commit()
+        logger.info(f"Deleted {deleted_count} messages for conversation {conversation_id}")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Conversation deleted successfully',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting conversation {conversation_id}: {e}")
+        return jsonify({'error': 'Failed to delete conversation'}), 500
 
 @ai_bp.route('/generate/itinerary', methods=['POST'])
 @jwt_required()
@@ -158,7 +191,8 @@ async def generate_itinerary():
             destination=data['destination'],
             days=int(data['days']),
             budget=data['budget'],
-            preferences=data.get('preferences')
+            preferences=data.get('preferences'),
+            currency=data.get('currency', 'USD')
         )
         
         return jsonify(itinerary)
@@ -178,7 +212,8 @@ async def generate_packing_list():
         packing_list = await ai_service.generate_packing_list(
             destination=data['destination'],
             duration=int(data['duration']),
-            activities=data.get('activities', [])
+            activities=data.get('activities', []),
+            currency=data.get('currency', 'USD')
         )
         
         return jsonify(packing_list)

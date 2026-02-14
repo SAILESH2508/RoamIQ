@@ -22,5 +22,5 @@ class MoodLog(db.Model):
             'polarity': self.polarity,
             'subjectivity': self.subjectivity,
             'note': self.note,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z'
         }

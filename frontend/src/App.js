@@ -14,6 +14,7 @@ import Profile from './components/Profile/Profile';
 import GenAIHub from './components/AI/GenAIHub';
 import TripDetails from './components/Travel/TripDetails';
 import Home from './components/Home';
+import WeatherPage from './components/Weather/WeatherPage';
 import './App.css';
 
 function ProtectedRoute({ children }) {
@@ -45,7 +46,7 @@ function PublicRoute({ children }) {
     );
   }
 
-  return user ? <Navigate to="/dashboard" /> : children;
+  return user ? <Navigate to="/" /> : children;
 }
 
 
@@ -93,6 +94,11 @@ function App() {
                 <Route path="/profile" element={
                   <ProtectedRoute>
                     <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="/weather" element={
+                  <ProtectedRoute>
+                    <WeatherPage />
                   </ProtectedRoute>
                 } />
 

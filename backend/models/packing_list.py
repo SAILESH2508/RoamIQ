@@ -24,5 +24,5 @@ class PackingItem(db.Model):
             'category': self.category,
             'is_packed': self.is_packed,
             'quantity': self.quantity,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z'
         }

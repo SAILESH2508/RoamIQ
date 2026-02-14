@@ -56,8 +56,24 @@ def log_request_info():
     """Log incoming request information"""
     logger.info(f"{request.method} {request.path} - IP: {request.remote_addr}")
 
+import inspect
+import asyncio
+
 def api_error_handler(f):
-    """Decorator for handling API errors in routes"""
+    """Decorator for handling API errors in routes (Async & Sync support)"""
+    if inspect.iscoroutinefunction(f):
+        @wraps(f)
+        async def async_decorated_function(*args, **kwargs):
+            try:
+                return await f(*args, **kwargs)
+            except APIError as e:
+                return handle_api_error(e)
+            except HTTPException as e:
+                return handle_http_exception(e)
+            except Exception as e:
+                return handle_generic_exception(e)
+        return async_decorated_function
+    
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:

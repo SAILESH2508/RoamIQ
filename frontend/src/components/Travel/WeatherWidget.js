@@ -38,48 +38,46 @@ const WeatherWidget = ({ destination }) => {
     if (!destination) return null;
 
     return (
-        <Card className="glass-card border-0 overflow-hidden h-100" style={{ background: 'linear-gradient(135deg, #FF9D6C 0%, #BB4E75 100%)', color: 'white' }}>
-            <Card.Body className="p-4 d-flex flex-column justify-content-between">
-                {loading ? (
+        <Card className="border-0 overflow-hidden h-100 shadow-sm" style={{ background: 'linear-gradient(135deg, #FF9966 0%, #FF5E62 100%)', color: 'white', borderRadius: '24px' }}>
+            <Card.Body className="p-4 d-flex flex-column justify-content-center">
+                {loading || !weather ? (
                     <div className="text-center py-4">
-                        <Spinner animation="border" size="sm" variant="light" />
-                        <p className="small mt-2">Checking skies in {destination}...</p>
+                        <Spinner animation="border" size="sm" variant="light" className="mb-2" />
+                        <p className="small mb-0 opacity-75">Checking forecast...</p>
                     </div>
                 ) : (
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-white"
                     >
                         <div className="d-flex justify-content-between align-items-start mb-3">
                             <div>
-                                <h5 className="fw-bold mb-0">{destination}</h5>
-                                <span className="small opacity-75">{weather.condition}</span>
+                                <h5 className="fw-bold mb-0 text-truncate" style={{ maxWidth: '180px' }}>{destination}</h5>
+                                <div className="small opacity-75">{weather.condition}</div>
                             </div>
-                            <FaCloudSun size={32} />
+                            <FaCloudSun size={28} className="opacity-75" />
                         </div>
 
-                        <div className="text-center my-3">
-                            <h1 className="display-4 fw-bold mb-0">{weather.temp}°C</h1>
+                        <div className="text-center my-2">
+                            <h1 className="fw-bold mb-0 display-4">{weather.temp}°C</h1>
                             <div className="small opacity-75">
                                 H: {weather.high}° L: {weather.low}°
                             </div>
                         </div>
 
-                        <div className="d-flex justify-content-between mt-4 bg-white bg-opacity-20 rounded-4 p-3">
+                        <div className="d-flex justify-content-around mt-4 pt-3 border-top border-white border-opacity-25">
                             <div className="text-center">
                                 <FaThermometerHalf className="mb-1 opacity-75" />
                                 <div className="small fw-bold">{weather.temp}°</div>
-                                <div className="x-small opacity-75" style={{ fontSize: '0.65rem' }}>Feels like</div>
                             </div>
                             <div className="text-center">
                                 <FaTint className="mb-1 opacity-75" />
                                 <div className="small fw-bold">{weather.humidity}%</div>
-                                <div className="x-small opacity-75" style={{ fontSize: '0.65rem' }}>Humidity</div>
                             </div>
                             <div className="text-center">
                                 <FaWind className="mb-1 opacity-75" />
                                 <div className="small fw-bold">{weather.wind} km/h</div>
-                                <div className="x-small opacity-75" style={{ fontSize: '0.65rem' }}>Wind</div>
                             </div>
                         </div>
                     </motion.div>

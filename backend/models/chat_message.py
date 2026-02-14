@@ -18,5 +18,5 @@ class ChatMessage(db.Model):
             'user_id': self.user_id,
             'role': self.role,
             'content': self.content,
-            'timestamp': self.timestamp.isoformat()
+            'timestamp': self.timestamp.isoformat() + 'Z' if self.timestamp else None
         }

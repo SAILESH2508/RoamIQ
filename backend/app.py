@@ -51,20 +51,17 @@ def create_app():
     
     # Register blueprints
     with app.app_context():
-        try:
-            from backend.routes.auth import auth_bp
-            from backend.routes.travel import travel_bp
-            from backend.routes.mood import mood_bp
-            from backend.routes.ai_routes import ai_bp
-            
-            app.register_blueprint(auth_bp, url_prefix='/api/auth')
-            app.register_blueprint(travel_bp, url_prefix='/api/travel')
-            app.register_blueprint(mood_bp, url_prefix='/api/mood')
-            app.register_blueprint(ai_bp, url_prefix='/api/ai')
-            
-            app.logger.info("Successfully registered all blueprints")
-        except ImportError as e:
-            app.logger.warning(f"Could not import routes: {e}")
+        from backend.routes.auth import auth_bp
+        from backend.routes.travel import travel_bp
+        from backend.routes.mood import mood_bp
+        from backend.routes.ai_routes import ai_bp
+        
+        app.register_blueprint(auth_bp, url_prefix='/api/auth')
+        app.register_blueprint(travel_bp, url_prefix='/api/travel')
+        app.register_blueprint(mood_bp, url_prefix='/api/mood')
+        app.register_blueprint(ai_bp, url_prefix='/api/ai')
+        
+        app.logger.info("Successfully registered all blueprints")
     
     # Health check endpoint
     @app.route('/api/health')

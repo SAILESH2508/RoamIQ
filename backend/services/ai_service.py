@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Any
 from backend.services.ai.llm_provider import llm_provider
 from backend.services.ai.rag_service import rag_service
 from datetime import datetime
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +23,14 @@ class AIService:
         model: str = "gemini-2.0-flash-lite",
         conversation_id: Optional[str] = None,
         user_preferences: Optional[Dict] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        currency: str = "USD"
     ) -> Dict[str, Any]:
         """Generate a contextual chat response with tool-calling support."""
         try:
             from backend.models.chat_message import ChatMessage
             from backend.extensions import db
-            from backend.app import app
+            from flask import current_app
             from backend.services.ai.tools import AVAILABLE_TOOLS, TOOL_DECLARATIONS
 
             # Ensure user_id is integer if provided
@@ -42,12 +44,12 @@ class AIService:
             async def get_history():
                 if not conversation_id:
                     return []
-                with app.app_context():
-                    past_messages = ChatMessage.query.filter_by(conversation_id=conversation_id)\
-                        .order_by(ChatMessage.timestamp.desc())\
-                        .limit(8).all() # Slightly reduced limit for speed
-                    past_messages.reverse()
-                    return [{"role": 'user' if msg.role == 'user' else 'model', "parts": [{"text": msg.content}]} for msg in past_messages]
+                # access db in current context
+                past_messages = ChatMessage.query.filter_by(conversation_id=conversation_id)\
+                    .order_by(ChatMessage.timestamp.desc())\
+                    .limit(8).all() # Slightly reduced limit for speed
+                past_messages.reverse()
+                return [{"role": 'user' if msg.role == 'user' else 'model', "parts": [{"text": msg.content}]} for msg in past_messages]
 
             async def get_rag_context():
                 # Only RAG if there's enough substance in the query
@@ -62,24 +64,23 @@ class AIService:
 
             # 2. Save user message (Done after history pull to avoid self-inclusion)
             if conversation_id:
-                 with app.app_context():
-                    user_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='user', content=message)
-                    db.session.add(user_msg)
-                    db.session.commit()
+                 user_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='user', content=message)
+                 db.session.add(user_msg)
+                 db.session.commit()
 
             # 4. System Prompt
             system_prompt = (
                 "You are RoamIQ, a professional travel orchestrator. "
                 "Help users plan trips, book tickets, manage expenses, and generate reports. "
+                f"ALWAYS use {currency} for any financial estimates or costs. "
                 "Be concise and focus on immediate travel needs."
             )
             
             if user_id:
                 from backend.models.user import User
-                with app.app_context():
-                    user = User.query.get(user_id)
-                    if user and user.last_location:
-                        system_prompt += f"\nUser's current location: {user.last_location}"
+                user = User.query.get(user_id)
+                if user and user.last_location:
+                    system_prompt += f"\nUser's current location: {user.last_location}"
 
             if context:
                 system_prompt += f"\n\nContext for advice: {context}"
@@ -96,8 +97,8 @@ class AIService:
                 tools=tools
             )
 
-            # Execution loop (up to 5 iterations to prevent infinite loops)
-            for _ in range(5):
+            # Execution loop (up to 3 iterations to prevent infinite loops and reduce lag)
+            for _ in range(3):
                 if isinstance(response, dict) and "tool_calls" in response:
                     tool_results_parts = []
                     
@@ -113,12 +114,12 @@ class AIService:
                             args['user_id'] = user_id
                             
                             # Execute within app context
-                            with app.app_context():
-                                try:
-                                    result = AVAILABLE_TOOLS[tool_name](**args)
-                                except Exception as e:
-                                    logger.error(f"Tool {tool_name} failed: {e}")
-                                    result = {"error": str(e)}
+                            # tools run synchronously, so just call them
+                            try:
+                                result = AVAILABLE_TOOLS[tool_name](**args)
+                            except Exception as e:
+                                logger.error(f"Tool {tool_name} failed: {e}")
+                                result = {"error": str(e)}
                             
                             # Add to response parts for next LLM iteration
                             tool_results_parts.append({
@@ -150,10 +151,9 @@ class AIService:
 
             # 6. Save AI response
             if conversation_id:
-                 with app.app_context():
-                    ai_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='ai', content=ai_text)
-                    db.session.add(ai_msg)
-                    db.session.commit()
+                 ai_msg = ChatMessage(conversation_id=conversation_id, user_id=user_id, role='ai', content=ai_text)
+                 db.session.add(ai_msg)
+                 db.session.commit()
 
             mood = self._basic_mood_analysis(message)
 
@@ -175,7 +175,8 @@ class AIService:
         destination: str, 
         days: int, 
         budget: str, 
-        preferences: Optional[Dict] = None
+        preferences: Optional[Dict] = None,
+        currency: str = "USD"
     ) -> Dict[str, Any]:
         """Generate a structured itinerary."""
         prompt = f"""Create a {days}-day itinerary for {destination} with a {budget} budget.
@@ -190,7 +191,7 @@ class AIService:
         
         response = await llm_provider.generate_response(
             prompt=prompt,
-            system_prompt="You are a professional travel local expert. You output ONLY valid JSON strings."
+            system_prompt=f"You are a professional travel local expert. You output ONLY valid JSON strings. ALWAYS use {currency} for all costs."
         )
         
         try:
@@ -206,9 +207,9 @@ class AIService:
             logger.error(f"Failed to parse itinerary: {e}. Raw: {response}")
             return {"error": "Failed to generate structured plan. Please try again."}
 
-    async def generate_packing_list(self, destination: str, duration: int, activities: List[str] = None) -> List[Dict]:
+    async def generate_packing_list(self, destination: str, duration: int, activities: List[str] = None, currency: str = "USD") -> List[Dict]:
         """Generate activities-aware packing list."""
-        prompt = f"Packing list for {duration} days in {destination}. Activities: {', '.join(activities or [])}. Return JSON array of objects with item, category, quantity, reason."
+        prompt = f"Packing list for {duration} days in {destination}. Activities: {', '.join(activities or [])}. Return JSON array of objects with item, category, quantity, reason. Mention costs of missing items if any in {currency}."
         
         response = await llm_provider.generate_response(
             prompt=prompt,
@@ -220,7 +221,8 @@ class AIService:
             if clean_res.startswith("```json"):
                 clean_res = clean_res[7:-3].strip()
             return json.loads(clean_res)
-        except:
+        except Exception as e:
+             logger.error(f"Failed to generate packing list: {e}")
              return [{"item": "Passport", "category": "Essentials", "quantity": 1, "reason": "Required"}]
 
     async def analyze_file(self, file_data: bytes, mime_type: str, filename: str) -> Dict[str, Any]:
@@ -387,8 +389,8 @@ class AIService:
         if user_id:
             try:
                 user_id = int(user_id)
-            except:
-                pass
+            except (ValueError, TypeError):
+                user_id = None
         
         patterns = {
             "travel_frequency": 0,
@@ -422,6 +424,33 @@ class AIService:
                 "Most of your trips are mid-range; we've found 3 premium deals in your budget."
             ],
             "timestamp": datetime.now().isoformat()
+        }
+
+    def calculate_sustainability_score(self, trip_data: Dict) -> float:
+        """Calculate a sustainability score from 0 to 1 based on transport and distance."""
+        score = 0.5 # Baseline
+        
+        transport = trip_data.get('transportation', '').lower()
+        if transport == 'train': score += 0.3
+        elif transport == 'bus': score += 0.2
+        elif transport == 'flight': score -= 0.2
+        
+        # Distance penalty
+        distance = trip_data.get('distance', 1000)
+        if distance > 5000: score -= 0.1
+        
+        return max(0.1, min(1.0, score))
+
+    def get_safety_alerts(self, destination: str) -> Dict:
+        """Search for travel safety alerts and common scams."""
+        # This could be an LLM call, but for speed let's use common data or simple search
+        # Mocking common alerts for demonstration
+        return {
+            "scam_alerts": [
+                f"Be aware of unofficial taxi aggregators in {destination}.",
+                "Common 'broken meter' scams reported at major transit hubs.",
+                "Keep valuables secured in crowded tourist areas."
+            ]
         }
 
 # Singleton instance

@@ -54,6 +54,6 @@ class User(db.Model):
             'preferred_currency': self.preferred_currency,
             'last_location': self._get_location_data(),
             'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() + 'Z',
+            'updated_at': self.updated_at.isoformat() + 'Z'
         }

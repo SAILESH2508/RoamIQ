@@ -3,7 +3,7 @@ import { Navbar as BootstrapNavbar, Nav, Container, NavDropdown } from 'react-bo
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { FaRobot, FaTachometerAlt, FaGlobe, FaChevronDown, FaTicketAlt, FaSync } from 'react-icons/fa';
+import { FaRobot, FaTachometerAlt, FaGlobe, FaChevronDown, FaSync, FaHome } from 'react-icons/fa';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -38,7 +38,7 @@ const Navbar = () => {
             {user ? (
               <>
                 <Nav.Link as={Link} to="/" className="nav-link-premium">
-                  <FaRobot />
+                  <FaHome />
                   Home
                 </Nav.Link>
 
@@ -47,20 +47,14 @@ const Navbar = () => {
                   Dashboard
                 </Nav.Link>
 
-                <Nav.Link as={Link} to="/ai" className="nav-link-premium">
+                <Nav.Link as={Link} to="/ai" className="nav-link-premium nav-link-ai-hub">
                   <FaRobot />
                   AI Hub
                 </Nav.Link>
 
-                <Nav.Link as={Link} to="/dashboard?tab=bookings" className="nav-link-premium">
-                  <FaTicketAlt />
-                  Bookings
-                </Nav.Link>
 
-                <Nav.Link
-                  className="nav-link-premium"
-                  onClick={() => window.open('https://weather-prediction-nu-nine.vercel.app/', '_blank')}
-                >
+
+                <Nav.Link as={Link} to="/weather" className="nav-link-premium">
                   <FaSync className="text-warning" />
                   Weather
                 </Nav.Link>
@@ -68,7 +62,7 @@ const Navbar = () => {
             ) : (
               <>
                 <Nav.Link as={Link} to="/" className="nav-link-premium">
-                  <FaRobot />
+                  <FaHome />
                   Home
                 </Nav.Link>
                 <Nav.Link href="#features" className="nav-link-premium">Features</Nav.Link>
