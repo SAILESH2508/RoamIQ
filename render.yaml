@@ -21,7 +21,6 @@ services:
   - type: web
     name: roamiq-frontend
     env: static
-    region: ohio
     plan: free
     repo: https://github.com/SAILESH2508/RoamIQ
     # Root directory for frontend build context
