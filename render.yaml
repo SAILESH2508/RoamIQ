@@ -1,0 +1,36 @@
+
+services:
+  # 1. Backend Service (Flask API)
+  - type: web
+    name: roamiq-backend
+    env: python
+    region: ohio
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: gunicorn backend.app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: backend.app:app
+    autoDeploy: false
+
+  # 2. Frontend Service (React Static Site)
+  - type: static
+    name: roamiq-frontend
+    env: static
+    region: ohio
+    plan: free
+    repo: https://github.com/SAILESH2508/RoamIQ
+    # Root directory for frontend build context
+    rootDir: frontend
+    # Build command: Install dependencies and build
+    buildCommand: npm install && npm run build
+    # Where the build artifacts live
+    staticPublishPath: ./build
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      # You must add REACT_APP_API_URL in the Render dashboard after deploying backend!

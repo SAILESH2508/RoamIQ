@@ -25,17 +25,28 @@ def create_app():
     app = Flask(__name__)
     setup_logging(app)
     
-    # Use absolute path for database with pathlib for better cross-platform support
-    from pathlib import Path
-    project_root = Path(__file__).resolve().parent.parent
-    db_path = project_root / 'instance' / 'roamiq.db'
+    # Database Configuration
+    # prioritizing environment variable (for production like Render/Postgres)
+    database_url = os.getenv('DATABASE_URL')
     
-    # SQLite on Windows needs special care with absolute paths (all forward slashes)
-    db_uri = f"sqlite:///{db_path.as_posix()}"
-    app.logger.info(f"Database URI: {db_uri}")
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+        
+    if database_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.logger.info("Using Production Database URL")
+    else:
+        # Fallback to local SQLite
+        from pathlib import Path
+        project_root = Path(__file__).resolve().parent.parent
+        db_path = project_root / 'instance' / 'roamiq.db'
+        
+        # SQLite on Windows needs special care with absolute paths (all forward slashes)
+        db_uri = f"sqlite:///{db_path.as_posix()}"
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+        app.logger.info(f"Using Local SQLite Database: {db_uri}")
     
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'roamiq-secret-key')
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
