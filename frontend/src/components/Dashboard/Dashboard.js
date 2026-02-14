@@ -6,7 +6,7 @@ import {
   FaMapMarkedAlt, FaCalendar, FaCoins, FaUsers,
   FaHome, FaSuitcase, FaChartBar, FaGlobe, FaMapMarkerAlt, FaTrash
 } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
 import ExpenseTracker from '../Travel/ExpenseTracker';

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../api/axios';
 import { toast } from 'react-toastify';
 
 const AuthContext = createContext();
@@ -17,14 +17,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Set up axios interceptor for authentication
+  // The axios instance handling of token is now done in src/api/axios.js via interceptors
+  // so we just need to keep our local state in sync.
   useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
+    setToken(localStorage.getItem('token'));
+  }, [user]);
 
   // Check if user is logged in on app start
   useEffect(() => {
@@ -32,14 +29,14 @@ export const AuthProvider = ({ children }) => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
         try {
-          axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+          // Token is automatically added by the interceptor in src/api/axios.js
           const response = await axios.get('/api/auth/profile');
           setUser(response.data.user);
-          setToken(savedToken);
         } catch (error) {
           console.error('Auth check failed:', error);
           localStorage.removeItem('token');
-          delete axios.defaults.headers.common['Authorization'];
+          setToken(null);
+          setUser(null);
         }
       }
       setLoading(false);
@@ -52,13 +49,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/login', credentials);
       const { access_token, user: userData } = response.data;
-      
+
       localStorage.setItem('token', access_token);
-      setToken(access_token);
       setUser(userData);
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
+
       toast.success('Login successful!');
       return { success: true };
     } catch (error) {
@@ -72,13 +66,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/register', userData);
       const { access_token, user: newUser } = response.data;
-      
+
       localStorage.setItem('token', access_token);
-      setToken(access_token);
       setUser(newUser);
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
+
       toast.success('Registration successful!');
       return { success: true };
     } catch (error) {
@@ -90,9 +81,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
-    setToken(null);
     setUser(null);
-    delete axios.defaults.headers.common['Authorization'];
     toast.info('Logged out successfully');
   };
 

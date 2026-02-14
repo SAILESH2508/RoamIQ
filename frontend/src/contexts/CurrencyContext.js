@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const CurrencyContext = createContext();
 

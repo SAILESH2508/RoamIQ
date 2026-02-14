@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Tab, Tabs } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaUser, FaHeart } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { toast } from 'react-toastify';
 
 const Profile = () => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Nav, Button, Badge, Spinner, Modal, Form } from 'react-bootstrap';
 import { FaCalendarAlt, FaMapMarkerAlt, FaSuitcase, FaTicketAlt, FaCoins, FaTrash, FaPen, FaUsers, FaArrowLeft, FaSave } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
 

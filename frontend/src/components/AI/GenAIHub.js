@@ -6,7 +6,7 @@ import {
     FaImage, FaSuitcase, FaTimes, FaUser, FaMapMarkedAlt, FaSync, FaFilePdf
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { toast } from 'react-toastify';
 import ReactMarkdown from 'react-markdown';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,9 +46,7 @@ const GenAIHub = () => {
 
     const fetchConversations = React.useCallback(async () => {
         try {
-            const res = await axios.get('/api/ai/chat/conversations', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await axios.get('/api/ai/chat/conversations');
             setConversations(res.data);
         } catch (err) {
             console.error("Failed to fetch conversations", err);
@@ -58,9 +56,7 @@ const GenAIHub = () => {
 
     const fetchUpcomingTrip = React.useCallback(async () => {
         try {
-            const res = await axios.get('/api/travel/trips', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await axios.get('/api/travel/trips');
             const trips = res.data.trips || [];
             if (trips.length > 0) {
                 const now = new Date();
@@ -80,9 +76,7 @@ const GenAIHub = () => {
     const loadConversation = React.useCallback(async (id) => {
         setIsLoading(true);
         try {
-            const res = await axios.get(`/api/ai/chat/history/${id}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const res = await axios.get(`/api/ai/chat/history/${id}`);
 
             const formatted = res.data.map(msg => ({
                 id: msg.id,
@@ -116,9 +110,7 @@ const GenAIHub = () => {
         if (!window.confirm("Are you sure you want to delete this conversation?")) return;
 
         try {
-            await axios.delete(`/api/ai/chat/conversations/${id}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            await axios.delete(`/api/ai/chat/conversations/${id}`);
 
             setConversations(prev => prev.filter(c => c.id !== id));
             toast.success("Conversation deleted");
@@ -238,7 +230,7 @@ const GenAIHub = () => {
                 const formData = new FormData();
                 formData.append('file', currentFile);
                 const res = await axios.post('/api/ai/file/analyze', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    headers: { 'Content-Type': 'multipart/form-data' }
                 });
 
                 // AIService returns 'summary' key
@@ -263,7 +255,7 @@ const GenAIHub = () => {
                 model: 'gemini-2.0-flash-lite',
                 conversation_id: conversationId,
                 currency: currentCurrency
-            }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            });
 
             addMessage(res.data.ai_response.trim(), 'ai', {
                 suggestions: res.data.suggestions
@@ -320,7 +312,7 @@ const GenAIHub = () => {
                     formData.append('conversation_id', conversationId);
                     try {
                         const res = await axios.post('/api/ai/audio/transcribe', formData, {
-                            headers: { 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                            headers: { 'Content-Type': 'multipart/form-data' }
                         });
 
                         if (res.data.text) {
@@ -353,7 +345,7 @@ const GenAIHub = () => {
                 destination: checkListPrompt.dest,
                 duration: checkListPrompt.days,
                 currency: currentCurrency
-            }, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            });
 
             addMessage("Here's your packing list!", 'ai', { packingList: res.data });
         } catch (err) {

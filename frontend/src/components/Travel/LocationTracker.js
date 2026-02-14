@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import api from '../../api/axios';
 import { FaMapMarkerAlt, FaSync } from 'react-icons/fa';
 import { Button } from 'react-bootstrap';
 
@@ -23,10 +24,8 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
                 console.warn('Reverse geocoding failed', err);
             }
 
-            const token = localStorage.getItem('token');
-            await axios.post('/api/travel/user/location',
-                { lat, lng, address },
-                { headers: { 'Authorization': `Bearer ${token}` } }
+            await api.post('/api/travel/user/location',
+                { lat, lng, address }
             );
 
             const newLoc = { lat, lng, address };

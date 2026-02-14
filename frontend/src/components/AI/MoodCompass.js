@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Row, Col, Button, Badge, Spinner } from 'react-bootstrap';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaSmile, FaMeh, FaFrown, FaBolt, FaMoon, FaMagic } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { toast } from 'react-toastify';
 
 const moods = [
