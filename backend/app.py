@@ -80,6 +80,22 @@ def create_app():
     jwt.init_app(app)
     cors.init_app(app)
     
+    # JWT Error Handlers for Debugging
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        app.logger.error("Token has expired")
+        return jsonify({"message": "Token has expired", "error": "token_expired"}), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        app.logger.error(f"Invalid token: {error}")
+        return jsonify({"message": "Signature verification failed", "error": "invalid_token"}), 401
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        app.logger.error(f"Request missing Authorization header: {error}")
+        return jsonify({"message": "Request does not contain an access token", "error": "authorization_required"}), 401
+    
 
     
     # Register blueprints

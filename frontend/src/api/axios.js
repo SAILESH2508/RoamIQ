@@ -18,6 +18,7 @@ instance.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
+            console.log(`[API] Attaching token to ${config.url}`);
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -44,6 +45,17 @@ instance.interceptors.response.use(
         return response;
     },
     (error) => {
+        // Handle 401 Unauthorized globally
+        if (error.response && error.response.status === 401) {
+            console.warn('[API] 401 Unauthorized - Clearing token and redirecting to login');
+            localStorage.removeItem('token');
+
+            // Only redirect if not already on an auth page to prevent loops
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/login' && currentPath !== '/register') {
+                window.location.href = '/login';
+            }
+        }
         return Promise.reject(error);
     }
 );

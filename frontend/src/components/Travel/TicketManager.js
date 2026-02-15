@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { Card, Table, Badge, Button, Modal, Form, Spinner } from 'react-bootstrap';
 import { FaTicketAlt, FaPlus, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';

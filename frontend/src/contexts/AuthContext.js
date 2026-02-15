@@ -34,10 +34,20 @@ export const AuthProvider = ({ children }) => {
           setUser(response.data.user);
         } catch (error) {
           console.error('Auth check failed:', error);
+          if (error.response && error.response.status === 401) {
+            // Token expired or invalid, clear it
+            localStorage.removeItem('token');
+            setToken(null);
+            setUser(null);
+          }
+          // For network errors etc, we might want to keep the token, 
+          // but for now, any auth failure clears session for safety
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
         }
+      } else {
+        setLoading(false);
       }
       setLoading(false);
     };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Table, Button, Form, Modal, Badge, Spinner } from 'react-bootstrap';
 import { FaPlus, FaTrash } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { toast } from 'react-toastify';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
