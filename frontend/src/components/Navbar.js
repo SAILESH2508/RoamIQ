@@ -25,10 +25,21 @@ const Navbar = () => {
     >
       <Container fluid className="px-lg-5">
         <BootstrapNavbar.Brand as={Link} to="/" className="d-flex align-items-center">
-          <div className="logo-container-premium">
-            <FaRobot className="text-white" size={20} />
-          </div>
-          <span className="logo-text-premium">RoamIQ</span>
+          <img
+            src="/logo.png"
+            alt="RoamIQ"
+            style={{
+              height: '40px',
+              width: 'auto',
+              maxWidth: '250px',
+              objectFit: 'contain'
+            }}
+            onError={(e) => {
+              e.target.src = "https://cdn-icons-png.flaticon.com/512/826/826070.png"; // Fallback icon
+              e.target.style.height = '30px';
+            }}
+          />
+          <span className="logo-text-premium ms-2">RoamIQ</span>
         </BootstrapNavbar.Brand>
 
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" className="border-0 shadow-none" />

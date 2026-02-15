@@ -4,7 +4,7 @@
   "description": "RoamIQ Frontend - Gen AI LLM-Powered Travel Companion",
   "main": "index.js",
   "scripts": {
-    "start": "react-scripts start",
+    "start": "set NODE_OPTIONS=--no-deprecation && node node_modules/react-scripts/bin/react-scripts.js start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
