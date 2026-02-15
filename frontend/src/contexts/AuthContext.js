@@ -50,13 +50,18 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/auth/login', credentials);
       const { access_token, user: userData } = response.data;
 
+      if (!access_token) {
+        throw new Error('Invalid response from server: No access token received');
+      }
+
       localStorage.setItem('token', access_token);
       setUser(userData);
 
       toast.success('Login successful!');
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.error || 'Login failed';
+      console.error('Login error:', error);
+      const message = error.response?.data?.error || error.message || 'Login failed';
       toast.error(message);
       return { success: false, error: message };
     }
@@ -67,13 +72,18 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/auth/register', userData);
       const { access_token, user: newUser } = response.data;
 
+      if (!access_token) {
+        throw new Error('Invalid response from server: No access token received');
+      }
+
       localStorage.setItem('token', access_token);
       setUser(newUser);
 
       toast.success('Registration successful!');
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.error || 'Registration failed';
+      console.error('Registration error:', error);
+      const message = error.response?.data?.error || error.message || 'Registration failed';
       toast.error(message);
       return { success: false, error: message };
     }

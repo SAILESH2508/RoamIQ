@@ -27,4 +27,25 @@ instance.interceptors.request.use(
     }
 );
 
+// Add a response interceptor to handle common errors
+instance.interceptors.response.use(
+    (response) => {
+        // If the response is HTML but we expected JSON, it's likely hitting the frontend SPA fallback
+        // This happens when the API URL is wrong or the proxy is not working
+        const contentType = response.headers['content-type'];
+        if (contentType && contentType.includes('text/html') && typeof response.data === 'string' && response.data.trim().startsWith('<!DOCTYPE')) {
+            return Promise.reject({
+                message: 'Invalid API response (HTML received instead of JSON)',
+                response: {
+                    data: { error: 'Backend server not reachable. Please check your API configuration.' }
+                }
+            });
+        }
+        return response;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 export default instance;
