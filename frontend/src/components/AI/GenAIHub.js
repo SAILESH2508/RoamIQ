@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Container, Button, Form, Modal, Spinner, Badge, Col, Dropdown } from 'react-bootstrap';
+import { Button, Form, Modal, Spinner, Badge, Dropdown, Col } from 'react-bootstrap';
 import {
     FaRobot, FaPaperPlane, FaMicrophone, FaPlus, FaTrash,
-    FaImage, FaSuitcase, FaTimes, FaUser, FaMapMarkedAlt, FaSync, FaCalendar, FaFilePdf,
+    FaImage, FaSuitcase, FaTimes, FaMapMarkedAlt, FaSync, FaCalendar, FaFilePdf,
     FaChartBar, FaEdit, FaEllipsisV, FaCheck
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
@@ -12,7 +11,6 @@ import { toast } from 'react-toastify';
 import ReactMarkdown from 'react-markdown';
 import { v4 as uuidv4 } from 'uuid';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { useAuth } from '../../contexts/AuthContext';
 
 const GenAIHub = () => {
     const { currentCurrency, formatCurrency } = useCurrency();
