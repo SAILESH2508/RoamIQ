@@ -61,3 +61,10 @@ temp/
 *.log
 lint_output.txt
 lint_output_utf8.txt
+
+# CI/CD
+.github/
+.vercel/
+render.yaml
+vercel.json
+requirements-render.txt
