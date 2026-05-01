@@ -1,0 +1,292 @@
+/* Using global variables from index.css - Updated for bold fonts */
+
+.chat-interface {
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    background: linear-gradient(135deg, #ffffff 0%, #fff4e6 100%);
+    border: 1px solid rgba(255, 122, 0, 0.1);
+    font-weight: 700 !important;
+}
+
+/* Make all text in AI hub bold */
+.chat-interface *,
+.chat-interface *::before,
+.chat-interface *::after,
+.chat-interface p,
+.chat-interface span,
+.chat-interface div,
+.chat-interface h1,
+.chat-interface h2,
+.chat-interface h3,
+.chat-interface h4,
+.chat-interface h5,
+.chat-interface h6,
+.chat-interface small,
+.chat-interface label,
+.chat-interface button,
+.chat-interface input,
+.chat-interface textarea {
+    font-weight: 700 !important;
+}
+
+/* Exceptions for code blocks and pre elements */
+.chat-interface pre,
+.chat-interface code,
+.chat-interface .markdown-content pre,
+.chat-interface .markdown-content code {
+    font-weight: 400 !important;
+    font-family: 'Courier New', monospace !important;
+}
+
+/* Message content bold */
+.chat-interface .message-bubble,
+.chat-interface .ai-message,
+.chat-interface .user-message,
+.chat-interface .markdown-content,
+.chat-interface .markdown-content *,
+.chat-interface .typing-indicator,
+.chat-interface .animate-pulse,
+.chat-interface .spinner-grow {
+    font-weight: 700 !important;
+}
+
+/* Loading states bold */
+.chat-interface .loading-text,
+.chat-interface .thinking-text,
+.chat-interface .status-text {
+    font-weight: 700 !important;
+}
+
+/* Input field bold */
+.chat-interface .ai-input-field,
+.chat-interface .ai-input-field::placeholder {
+    font-weight: 700 !important;
+}
+
+/* Sidebar Navigation Styles */
+.sidebar-nav {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.sidebar-item {
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.sidebar-item:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(255, 122, 0, 0.15) !important;
+}
+
+.hover-bg-light:hover {
+    background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 8px 25px rgba(255, 122, 0, 0.15) !important;
+}
+
+/* Enhanced Glassmorphism */
+.glass-panel {
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 8px 32px 0 rgba(255, 122, 0, 0.08) !important;
+}
+
+.glass-panel:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 15px 40px -5px rgba(255, 122, 0, 0.15) !important;
+    border-color: rgba(255, 122, 0, 0.3) !important;
+}
+
+.glass-panel-bottom {
+    background: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Postcard Aesthetic */
+.postcard-bubble {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: #ffffff !important;
+    border: 2px solid #ff7a00 !important;
+    font-family: 'Poppins', sans-serif;
+}
+
+.postcard-bubble:hover {
+    transform: translateY(-5px) rotate(0.5deg);
+}
+
+.postcard-content {
+    font-family: 'Permanent Marker', cursive !important;
+    color: #e66e00;
+}
+
+/* Animations */
+.animate-pop-up {
+    animation: popUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes popUp {
+    0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.hover-rotate:hover {
+    transform: rotate(360deg);
+}
+
+.hover-rotate {
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+/* Gradients */
+.bg-primary-gradient {
+    background: var(--primary-gradient) !important;
+}
+
+.gradients-text {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+/* Utilities */
+.x-small {
+    font-size: 0.7rem !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    display: none;
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    display: none;
+    background: transparent;
+}
+
+/* Hide scrollbars for all browsers */
+.custom-scrollbar {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    display: none;  /* Safari and Chrome */
+}
+
+/* Hide scrollbars in AI chat sections */
+.gen-ai-hub .overflow-auto {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+.gen-ai-hub .overflow-auto::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+.gen-ai-hub .overflow-hidden {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+.gen-ai-hub .overflow-hidden::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+/* Hide scrollbars in all scrollable containers within AI hub */
+.gen-ai-hub div[style*="overflow"] {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+.gen-ai-hub div[style*="overflow"]::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+/* Enhanced Input Field Styling */
+.ai-input-field {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    transition: all 0.2s ease !important;
+}
+
+.ai-input-field:focus {
+    box-shadow: none !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    outline: none !important;
+}
+
+.ai-input-field::placeholder {
+    color: #ff9533 !important;
+    opacity: 1 !important;
+    font-weight: 700 !important;
+}
+
+/* Enhanced Button Animations */
+.glow-on-hover {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.glow-on-hover:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(255, 122, 0, 0.4) !important;
+    filter: brightness(1.1) !important;
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

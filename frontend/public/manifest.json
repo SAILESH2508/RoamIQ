@@ -1,0 +1,15 @@
+{
+    "short_name": "RoamIQ",
+    "name": "RoamIQ - AI Travel Companion",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#f97316",
+    "background_color": "#ffffff"
+}

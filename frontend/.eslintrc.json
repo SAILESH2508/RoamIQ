@@ -1,0 +1,15 @@
+{
+    "extends": "react-app",
+    "overrides": [
+        {
+            "files": ["**/*.js", "**/*.jsx"],
+            "globals": {
+                "validate": "readonly"
+            }
+        }
+    ],
+    "rules": {
+        "no-undef": "off",
+        "no-unused-vars": "warn"
+    }
+}
