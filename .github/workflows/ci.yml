@@ -10,14 +10,27 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Run tests
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
       run: |
-        echo "Running CI checks..."
-        echo "All checks passed!"
+        cd frontend
+        npm install --legacy-peer-deps
+        
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Success
+      run: echo "CI build completed successfully!"
