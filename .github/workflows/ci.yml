@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  frontend:
     runs-on: ubuntu-latest
     
     steps:
@@ -32,5 +32,28 @@ jobs:
         cd frontend
         npm run build
         
-    - name: Success
-      run: echo "CI build completed successfully!"
+    - name: Frontend Success
+      run: echo "Frontend build completed successfully!"
+
+  backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Test backend imports
+      run: |
+        python -c "import backend.app; print('Backend imports successfully')"
+        
+    - name: Backend Success
+      run: echo "Backend tests completed successfully!"
