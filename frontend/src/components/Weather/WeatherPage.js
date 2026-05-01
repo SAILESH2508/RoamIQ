@@ -125,7 +125,7 @@ const WeatherPage = () => {
             {/* Iframe Container */}
             <div style={{ flex: 1, position: 'relative', width: '100%', overflow: 'hidden' }}>
                 <iframe
-                    src="https://weather-prediction-nu-nine.vercel.app/"
+                    src="https://weather.com/weather/today/l/"
                     title="Weather Prediction"
                     style={{
                         width: '100%',

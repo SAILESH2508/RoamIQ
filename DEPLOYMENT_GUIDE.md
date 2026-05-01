@@ -1,7 +1,7 @@
 
-# 🚀 Hosting RoamIQ for FREE (Alternatives to Vercel)
+# 🚀 Hosting RoamIQ for FREE
 
-Since Vercel has limitations with Python backend deployments (especially with heavy AI libraries), we recommend using **Render** or **Railway**.
+We recommend using **Render** or **Railway** for hosting RoamIQ.
 
 ## ✅ Option 1: Render.com (Highly Recommended)
 
