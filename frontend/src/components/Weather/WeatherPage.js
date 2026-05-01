@@ -125,7 +125,7 @@ const WeatherPage = () => {
             {/* Iframe Container */}
             <div style={{ flex: 1, position: 'relative', width: '100%', overflow: 'hidden' }}>
                 <iframe
-                    src="https://weather.com/weather/today/l/"
+                    src="https://wttr.in/"
                     title="Weather Prediction"
                     style={{
                         width: '100%',
