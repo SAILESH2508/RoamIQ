@@ -1,57 +1,65 @@
 
 # 🚀 Hosting RoamIQ for FREE
 
-We recommend using **Render** or **Railway** for hosting RoamIQ.
+This repository is designed for local development and self-hosting.
 
-## ✅ Option 1: Render.com (Highly Recommended)
+## 🏠 Local Development Setup
 
-Render offers a generous **Free Tier** for both Python Web Services and React Static Sites.
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Git
 
-### Step 1: Push Changes
-Ensure you have pushed the latest code (including `render.yaml` and `requirements-render.txt`) to GitHub:
+### Backend Setup
 ```bash
-git add .
-git commit -m "Add Render deployment config"
-git push origin main
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run the backend
+python run_backend.py
 ```
 
-### Step 2: Deploy on Render
-1.  **Sign Up/Login** at [render.com](https://render.com).
-2.  Click **"New +"** -> **"Blueprint"**.
-3.  Connect your GitHub repository (`SAILESH2508/RoamIQ`).
-4.  Render will automatically detect the `render.yaml` file.
-5.  Click **"Apply"** or **"Create Resources"**.
+### Frontend Setup
+```bash
+# Navigate to frontend directory
+cd frontend
 
-### Step 3: Configure Environment Variables
-In the Render Dashboard for your **Backend Service**:
-1.  Go to **Environment**.
-2.  Add:
-    *   `SECRET_KEY`: (Generate a random string)
-    *   `OPENAI_API_KEY`: (Your OpenAI Key)
-    *   `DATABASE_URL`: (Optional - see below)
+# Install Node.js dependencies
+npm install --legacy-peer-deps
 
-### Step 4: Configure Frontend
-1.  Once the Backend is deployed, copy its URL (e.g., `https://roamiq-backend.onrender.com`).
-2.  Go to the **Frontend Static Site** settings on Render.
-3.  Add Environment Variable:
-    *   `REACT_APP_API_URL`: `https://roamiq-backend.onrender.com`
-4.  **Redeploy** the Frontend so it picks up the API URL.
+# Start the development server
+npm start
+```
+
+## 🌐 Self-Hosting Options
+
+You can deploy this application on any cloud provider that supports:
+- Python Flask applications
+- React static files
+- PostgreSQL/SQLite databases
+
+Popular options include:
+- DigitalOcean
+- AWS
+- Google Cloud
+- Azure
+- Railway
+- Heroku
 
 ---
 
-## 🗄️ Database Strategy (Critical)
-The default SQLite database (`roamiq.db`) will reflect changes, but **data will be lost every time the free server restarts (spins down)**.
+## 🗄️ Database Strategy
 
-**For persistent data on the free tier:**
-1.  Sign up for [Neon.tech](https://neon.tech) (Free Postgres Database).
-2.  Create a project and copy the **Connection String** (`postgres://...`).
-3.  In Render Backend Environment Variables, add:
-    *   `DATABASE_URL`: `postgres://...` (Paste the Neon string)
-4.  The app will automatically switch to using Postgres!
+The application uses SQLite by default for development. For production:
+1. Set up a PostgreSQL database
+2. Configure the `DATABASE_URL` environment variable
+3. The app will automatically switch to PostgreSQL
 
 ---
 
 ## ⚠️ Important Note on AI
-We have created a lightweight `requirements-render.txt` that **excludes heavy AI libraries** (Torch, Transformers) to ensure it fits on the free tier.
-*   The App will use **OpenAI API** for intelligence.
-*   Local AI features (if any remains) might be disabled in production.
+
+The application includes both local AI capabilities and OpenAI API integration:
+- Local AI uses libraries like Torch, Transformers, etc.
+- OpenAI API provides cloud-based AI features
+- You can choose which to use based on your hosting environment
