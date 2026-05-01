@@ -15,7 +15,7 @@ services:
         value: production
       - key: FLASK_APP
         value: backend.app:app
-    autoDeploy: false
+    autoDeploy: true
 
   # 2. Frontend Service (React App via Node.js)
   - type: web
@@ -23,12 +23,13 @@ services:
     env: node
     region: ohio
     plan: free
-    repo: https://github.com/SAILESH2508/RoamIQ
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npx serve -s build -l $PORT
-
     envVars:
       - key: NODE_VERSION
         value: 18.17.0
-      # You must add REACT_APP_API_URL in the Render dashboard after deploying backend!
+      - key: REACT_APP_API_URL
+        value: https://roamiq-backend.onrender.com
+      - key: NPM_CONFIG_LEGACY_PEER_DEPS
+        value: "true"
