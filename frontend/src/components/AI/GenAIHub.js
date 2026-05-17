@@ -12,10 +12,12 @@ import ReactMarkdown from 'react-markdown';
 import { v4 as uuidv4 } from 'uuid';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useData } from '../../contexts/DataContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const GenAIHub = () => {
     const { currentCurrency, formatCurrency } = useCurrency();
     const { trips, fetchTrips, refreshData } = useData();
+    const { isDarkMode } = useTheme();
 
     // Core State
     const [messages, setMessages] = useState([]);
@@ -421,16 +423,21 @@ const GenAIHub = () => {
                 boxShadow: 'none' 
             }}>
                 {/* Active Chat Header */}
-                <div className="p-3 bg-white d-flex justify-content-between align-items-center shadow-sm" style={{ zIndex: 10, borderBottom: '1px solid var(--glass-border-weather)' }}>
+                <div className="p-3 d-flex justify-content-between align-items-center shadow-sm" style={{ 
+                    zIndex: 10, 
+                    borderBottom: '1px solid var(--glass-border-weather)',
+                    background: 'var(--sidebar-bg)',
+                    color: 'var(--text-main)'
+                }}>
                     <div className="d-flex align-items-center gap-3">
                         <div className="bg-primary p-2 rounded-circle shadow-sm border border-2" style={{ backgroundColor: 'var(--primary)', border: '2px solid var(--primary-dark)' }}>
                             <FaRobot className="text-white" size={18} />
                         </div>
                         <div>
-                            <h6 className="mb-0 fw-bold text-dark">
+                            <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-main)' }}>
                                 {conversations.find(c => c.id === conversationId)?.title || "Current Adventure"}
                             </h6>
-                            <small className="text-muted x-small fw-bold text-uppercase" style={{ letterSpacing: '0.5px' }}>AI Assistant Online</small>
+                            <small className="text-muted x-small fw-bold text-uppercase" style={{ letterSpacing: '0.5px', color: 'var(--text-muted)' }}>AI Assistant Online</small>
                         </div>
                     </div>
                     <div className="d-flex gap-2">
@@ -448,37 +455,56 @@ const GenAIHub = () => {
                 <div 
                     className="messages-stream custom-scrollbar p-4 flex-grow-1 position-relative" 
                     style={{ 
-                        backgroundImage: `linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url(/assets/ai-assistant.png)`,
+                        backgroundImage: isDarkMode 
+                            ? `linear-gradient(rgba(10, 15, 36, 0.95), rgba(10, 15, 36, 0.95)), url(/assets/ai-assistant.png)`
+                            : `linear-gradient(rgba(255, 248, 240, 0.95), rgba(255, 248, 240, 0.95)), url(/assets/ai-assistant.png)`,
                         backgroundSize: '300px',
                         backgroundPosition: 'center',
                         backgroundRepeat: 'no-repeat',
-                        backgroundAttachment: 'local'
+                        backgroundAttachment: 'local',
+                        backgroundColor: 'var(--bg-main)'
                     }}
                 >
-                    <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-5" style={{ 
-                        zIndex: 0, 
-                        pointerEvents: 'none',
-                        opacity: messages.length > 1 ? 0.15 : 0.8,
-                        transition: 'opacity 0.3s ease'
-                    }}>
-                        <div className="text-center animate-fade-in" style={{ maxWidth: '600px' }}>
-                            <div className="mb-5 animate-pop-up">
-                                <div className="d-inline-block p-3 rounded-4" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
-                                    <img 
-                                        src="/assets/ai-assistant.png" 
-                                        alt="AI Assistant" 
-                                        className="img-fluid rounded-3 shadow" 
-                                        style={{ maxHeight: '230px' }} 
-                                    />
+                    {messages.length <= 1 && (
+                        <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-5 animate-fade-in" style={{ 
+                            zIndex: 0, 
+                            pointerEvents: 'none',
+                            opacity: 0.85
+                        }}>
+                            <div className="text-center animate-fade-in" style={{ maxWidth: '600px' }}>
+                                <div className="mb-5 animate-pop-up">
+                                    <div className="d-inline-block p-3 rounded-4 shadow-sm" style={{ 
+                                        background: 'var(--glass-bg-weather)', 
+                                        border: '1px solid var(--glass-border-weather)', 
+                                        backdropFilter: 'blur(16px)', 
+                                        WebkitBackdropFilter: 'blur(16px)' 
+                                    }}>
+                                        <img 
+                                            src="/assets/ai-assistant.png" 
+                                            alt="AI Assistant" 
+                                            className="img-fluid rounded-3 shadow-md" 
+                                            style={{ maxHeight: '230px' }} 
+                                        />
+                                    </div>
                                 </div>
+                                <h2 className="fw-black mb-3" style={{ color: 'var(--text-main)' }}>RoamIQ Studio</h2>
+                                <p className="fs-5 fw-bold" style={{ color: 'var(--text-muted)' }}>Analyze receipts, plan itineraries, or summarize travel documents with RoamIQ AI intelligence.</p>
                             </div>
-                            <h2 className="fw-black mb-3" style={{ color: 'var(--text-main)' }}>RoamIQ Studio</h2>
-                            <p className="fs-5" style={{ color: 'var(--text-muted)' }}>Analyze receipts, plan itineraries, or summarize travel documents with RoamIQ AI intelligence.</p>
                         </div>
-                    </div>
+                    )}
                     {messages.map(msg => (
                             <div key={msg.id} className={`d-flex ${msg.type === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-4 animate-fade-in`} style={{ position: 'relative', zIndex: 1 }}>
-                                <div className={`message-bubble ${msg.type === 'user' ? 'user-message shadow-sm' : 'ai-message border glass-panel bg-white bg-opacity-75'}`} style={{ maxWidth: '85%', borderRadius: '20px', backdropFilter: 'blur(10px)', fontWeight: '700' }}>
+                                <div className={`message-bubble ${msg.type === 'user' ? 'user-message shadow-sm' : 'ai-message border glass-panel'}`} style={{ 
+                                    maxWidth: '85%', 
+                                    borderRadius: '20px', 
+                                    backdropFilter: 'blur(10px)', 
+                                    WebkitBackdropFilter: 'blur(10px)',
+                                    fontWeight: '700',
+                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.65)',
+                                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'var(--glass-border-weather)',
+                                    color: 'var(--text-main)',
+                                    padding: '16px 20px'
+                                }}>
                                     {msg.image && <img src={msg.image} alt="Upload" className="img-fluid rounded-3 mb-2 shadow-sm" style={{ maxHeight: '300px' }} />}
                                     {msg.isPdf && (
                                         <div className="bg-light p-3 rounded-3 mb-2 border d-flex align-items-center gap-3">
@@ -548,34 +574,48 @@ const GenAIHub = () => {
                             </div>
                         ))}
                     {isLoading && (
-                        <div className="ai-message border glass-panel bg-white p-3 rounded-4 d-flex align-items-center gap-3 animate-pulse" style={{ width: 'fit-content' }}>
+                        <div className="ai-message border glass-panel p-3 rounded-4 d-flex align-items-center gap-3 animate-pulse" style={{ 
+                            width: 'fit-content',
+                            background: isDarkMode ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.65)',
+                            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'var(--glass-border-weather)'
+                        }}>
                             <Spinner animation="grow" size="sm" variant="primary" />
-                            <span className="small fw-bold text-muted" style={{ fontWeight: '700' }}>RoamIQ AI is thinking...</span>
+                            <span className="small fw-bold" style={{ fontWeight: '700', color: 'var(--text-main)' }}>RoamIQ AI is thinking...</span>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input Area (WhatsApp/ChatGPT Style) */}
-                <div className="p-3 bg-white border-top">
+                <div className="p-3 border-top" style={{
+                    background: 'var(--sidebar-bg)',
+                    borderTop: '1px solid var(--glass-border-weather)'
+                }}>
                     {filePreview && (
                         <div className="position-relative d-inline-block mb-2 ms-4">
-                            <img src={filePreview} alt="Preview" className="rounded-3 shadow-sm border" style={{ height: '70px', objectFit: 'cover', width: '70px' }} />
+                            <img src={filePreview} alt="Preview" className="rounded-3 shadow-sm border" style={{ height: '70px', objectFit: 'cover', width: '70px', borderColor: 'var(--glass-border-weather)' }} />
                             <Button variant="danger" size="sm" className="position-absolute top-0 end-0 rounded-circle p-0" style={{ width: '20px', height: '20px', marginTop: '-8px', marginRight: '-8px' }} onClick={() => { setSelectedFile(null); setFilePreview(null); }}><FaTimes size={10} /></Button>
                         </div>
                     )}
                             {selectedFile && !filePreview && (
-                                <div className="bg-light p-2 rounded-3 d-inline-flex align-items-center gap-2 mb-2 ms-4 border shadow-sm">
+                                <div className="p-2 rounded-3 d-inline-flex align-items-center gap-2 mb-2 ms-4 border shadow-sm" style={{
+                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(248, 249, 250, 1)',
+                                    borderColor: 'var(--glass-border-weather)',
+                                    color: 'var(--text-main)'
+                                }}>
                                     <FaFilePdf className="text-danger" />
                                     <span className="small fw-bold">{selectedFile.name}</span>
                                     <FaTimes className="text-muted clickable" size={12} onClick={() => {
                                         setSelectedFile(null);
-                                    }} />
+                                    }} style={{ color: 'var(--text-muted)' }} />
                                 </div>
                             )}
                     
                     <Form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="px-2">
-                        <div className="d-flex align-items-center gap-2 bg-light rounded-pill p-1 px-3 shadow-sm border focus-within-orange">
+                        <div className="d-flex align-items-center gap-2 rounded-pill p-1 px-3 shadow-sm border focus-within-orange" style={{
+                            background: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(248, 249, 250, 1)',
+                            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)'
+                        }}>
                             <input type="file" ref={fileInputRef} className="d-none" onChange={(e) => {
                                 const file = e.target.files[0];
                                 if (file) {
@@ -591,6 +631,7 @@ const GenAIHub = () => {
                                 className="rounded-circle p-2 border-0 bg-transparent text-muted hover-primary"
                                 onClick={() => fileInputRef.current.click()}
                                 disabled={isLoading}
+                                style={{ color: 'var(--text-muted)' }}
                             >
                                 <FaPlus size={18} />
                             </Button>
@@ -601,7 +642,11 @@ const GenAIHub = () => {
                                 value={inputMessage} 
                                 onChange={(e) => setInputMessage(e.target.value)} 
                                 disabled={isLoading} 
-                                style={{ fontSize: '0.95rem', fontWeight: '700' }}
+                                style={{ 
+                                    fontSize: '0.95rem', 
+                                    fontWeight: '700',
+                                    color: 'var(--text-main)'
+                                }}
                             />
 
                             <Button 
@@ -671,9 +716,9 @@ const GenAIHub = () => {
                             </div>
                         ) : (
                             conversations.map(conv => (
-                                <div key={conv.id} className="position-relative group border-bottom border-light pb-2">
+                                <div key={conv.id} className="position-relative group pb-2" style={{ borderBottom: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.08)' }}>
                                     {editingConvId === conv.id ? (
-                                        <div className="d-flex gap-2 p-2 bg-light rounded-3">
+                                        <div className="d-flex gap-2 p-2 rounded-3" style={{ background: isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(248, 249, 250, 1)' }}>
                                             <Form.Control 
                                                 className="form-control-premium"
                                                 value={editTitle} 
@@ -684,17 +729,21 @@ const GenAIHub = () => {
                                             <Button className="btn-premium px-3" onClick={() => handleRenameConversation(conv.id)}><FaCheck /></Button>
                                         </div>
                                     ) : (
-                                        <div className={`d-flex align-items-center w-100 rounded-3 p-2 transition-all ${conv.id === conversationId ? 'bg-primary-light bg-opacity-10 border border-primary border-opacity-20' : 'hover-bg-light'}`}>
-                                            <div className="bg-primary-light bg-opacity-10 p-2 rounded-circle me-3">
+                                        <div className={`d-flex align-items-center w-100 rounded-3 p-2 transition-all ${conv.id === conversationId ? 'border border-primary border-opacity-25' : 'hover-bg-light-theme-aware'}`} style={{
+                                            background: conv.id === conversationId 
+                                                ? 'rgba(255, 107, 0, 0.08)' 
+                                                : 'transparent'
+                                        }}>
+                                            <div className="p-2 rounded-circle me-3" style={{ background: conv.id === conversationId ? 'rgba(255, 107, 0, 0.15)' : 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)' }}>
                                                 <FaMapMarkedAlt className="text-primary" size={14} />
                                             </div>
                                             <button 
-                                                className={`border-0 flex-grow-1 text-start fw-bold small ${conv.id === conversationId ? 'text-primary' : 'text-dark'}`} 
+                                                className="border-0 flex-grow-1 text-start fw-bold small" 
                                                 onClick={() => { loadConversation(conv.id); setShowHistoryModal(false); }}
-                                                style={{ background: 'transparent' }}
+                                                style={{ background: 'transparent', color: conv.id === conversationId ? 'var(--primary)' : 'var(--text-main)' }}
                                             >
                                                 {conv.title || "Untitled Trip"}
-                                                <div className="x-small text-muted fw-normal">Adventure ID: {conv.id.substring(0, 8)}...</div>
+                                                <div className="x-small text-muted fw-normal" style={{ color: 'var(--text-muted)' }}>Adventure ID: {conv.id.substring(0, 8)}...</div>
                                             </button>
                                             <Dropdown align="end">
                                                 <Dropdown.Toggle as="div" className="px-2 py-2 clickable text-muted opacity-50 hover-opacity-100">
