@@ -109,9 +109,53 @@ const WeatherPage = ({ locationName }) => {
                         lon = parsed.lng;
                         city = parsed.address;
                     } else {
-                        lat = DEFAULT_LAT;
-                        lon = DEFAULT_LON;
-                        city = DEFAULT_CITY;
+                        // Automatically fetch current browser location if no cache exists!
+                        if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(
+                                async (position) => {
+                                    const autoLat = position.coords.latitude;
+                                    const autoLon = position.coords.longitude;
+                                    let autoCity = 'Current Location';
+                                    try {
+                                        const revRes = await axios.get(`/api/travel/reverse?lat=${autoLat}&lon=${autoLon}`);
+                                        if (revRes.data) {
+                                            const addr = revRes.data.address;
+                                            const suburb = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet;
+                                            const main = addr.city || addr.town || addr.municipality;
+                                            
+                                            if (suburb) {
+                                                const isCoimbatore = (addr.county && addr.county.toLowerCase().includes('coimbatore')) || 
+                                                                   (main && main.toLowerCase().includes('coimbatore')) ||
+                                                                   (addr.city && addr.city.toLowerCase().includes('coimbatore'));
+                                                if (isCoimbatore && suburb.toLowerCase() !== 'coimbatore') {
+                                                    autoCity = `${suburb}, Coimbatore`;
+                                                } else {
+                                                    autoCity = main ? `${suburb}, ${main}` : suburb;
+                                                }
+                                            } else {
+                                                autoCity = main || addr.county || 'Current Location';
+                                            }
+                                            if (addr.country) autoCity += `, ${addr.country}`;
+                                        }
+                                    } catch (e) {
+                                        console.error("Auto geocoding failed", e);
+                                    }
+                                    const newLoc = { lat: autoLat, lng: autoLon, address: autoCity };
+                                    localStorage.setItem('roamiq-user-location', JSON.stringify(newLoc));
+                                    navigate(`/weather?lat=${autoLat}&lon=${autoLon}&city=${encodeURIComponent(autoCity)}`);
+                                },
+                                () => {
+                                    // Silent fallback to Coimbatore quietly on permission denial/timeout
+                                    navigate(`/weather?lat=${DEFAULT_LAT}&lon=${DEFAULT_LON}&city=${encodeURIComponent(DEFAULT_CITY)}`);
+                                },
+                                { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+                            );
+                            return; // Wait for navigation redirect
+                        } else {
+                            lat = DEFAULT_LAT;
+                            lon = DEFAULT_LON;
+                            city = DEFAULT_CITY;
+                        }
                     }
                 }
             } else if (!city) {
@@ -268,10 +312,10 @@ const WeatherPage = ({ locationName }) => {
                 },
                 (error) => {
                     console.error("Geolocation error:", error);
-                    alert("Unable to retrieve GPS location. Please check your browser permissions.");
+                    alert("Unable to retrieve GPS location. Please check your browser permissions or enable Location Services.");
                     setInitialLoading(false);
                 },
-                { timeout: 7000 }
+                { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
             );
         } else {
             alert("Geolocation is not supported by your browser.");
