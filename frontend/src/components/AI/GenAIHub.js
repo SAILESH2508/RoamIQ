@@ -383,18 +383,18 @@ const GenAIHub = () => {
                 </div>
 
                 {/* 5. NEXT EXPEDITION */}
-                <div className="mt-2 pt-3 border-top">
+                <div className="mt-auto pt-3" style={{ borderTop: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--glass-border-weather)' }}>
                     {upcomingTrip ? (
                         <>
-                            <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.65rem' }}>Next Expedition</h6>
+                            <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Next Expedition</h6>
                             <div className="glass-card p-3 border-start border-primary border-3 shadow-sm hover-lift transition-all rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', borderLeft: '3px solid var(--primary)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                                 <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <span className="fw-black text-dark small" style={{ fontSize: '0.85rem', lineHeight: '1.2' }}>{upcomingTrip.title || upcomingTrip.destination}</span>
+                                    <span className="fw-black small" style={{ fontSize: '0.85rem', lineHeight: '1.2', color: 'var(--text-main)' }}>{upcomingTrip.title || upcomingTrip.destination}</span>
                                     <FaMapMarkedAlt className="text-primary opacity-50" size={14} />
                                 </div>
                                 <div className="d-flex align-items-center gap-2 mb-2">
-                                    <FaCalendar className="text-muted" size={10} />
-                                    <span className="small text-muted fw-bold" style={{ fontSize: '0.7rem' }}>{new Date(upcomingTrip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <FaCalendar className="text-muted" size={10} style={{ color: 'var(--text-muted)' }} />
+                                    <span className="small text-muted fw-bold" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(upcomingTrip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                                 </div>
                                 <div className="d-flex justify-content-between align-items-center">
                                     <span className="small fw-bold text-primary" style={{ fontSize: '0.75rem' }}>{formatCurrency(upcomingTrip.budget)}</span>
@@ -404,7 +404,7 @@ const GenAIHub = () => {
                         </>
                     ) : (
                         <div className="text-center p-3 glass-panel opacity-50 rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)' }}>
-                            <small className="fw-bold text-muted small" style={{ fontSize: '0.75rem' }}>No upcoming trips</small>
+                            <small className="fw-bold small" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No upcoming trips</small>
                         </div>
                     )}
                 </div>
