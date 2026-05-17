@@ -783,6 +783,88 @@ def proxy_reverse():
         logger.error(f"Reverse geocoding proxy error: {e}")
         return jsonify({'error': f'Internal Reverse Error: {str(e)}'}), 500
 
+def generate_mock_weather(lat, lon, city):
+    """Generates highly realistic fallback mock weather data when API is unavailable"""
+    import random
+    from datetime import datetime, timedelta
+    
+    try:
+        lat_float = float(lat)
+    except:
+        lat_float = 11.0168
+        
+    base_temp = 28.0 if 8.0 <= lat_float <= 15.0 else 22.0
+    is_day_now = 1 if 6 <= datetime.now().hour <= 18 else 0
+    
+    # Generate 48 hourly steps
+    hourly_temps = []
+    hourly_humidity = []
+    hourly_precip = []
+    hourly_time = []
+    hourly_codes = []
+    hourly_is_day = []
+    
+    start_hour = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=12)
+    for i in range(48):
+        time_step = start_hour + timedelta(hours=i)
+        hour = time_step.hour
+        # Diurnal temp cycle
+        temp_offset = 6.0 * (1.0 if 12 <= hour <= 16 else (-1.0 if hour >= 22 or hour <= 5 else 0.0))
+        hourly_temps.append(round(base_temp + temp_offset + random.uniform(-1.5, 1.5), 1))
+        hourly_humidity.append(random.randint(55, 85))
+        hourly_precip.append(random.randint(0, 20))
+        hourly_time.append(time_step.strftime('%Y-%m-%dT%H:00'))
+        hourly_codes.append(2 if random.random() > 0.3 else 1)
+        hourly_is_day.append(1 if 6 <= hour <= 18 else 0)
+
+    # Generate 7 daily steps
+    daily_time = []
+    daily_temp_max = []
+    daily_temp_min = []
+    daily_codes = []
+    daily_sunrise = []
+    daily_sunset = []
+    daily_precip_max = []
+    
+    today = datetime.now().date()
+    for i in range(7):
+        day_step = today + timedelta(days=i)
+        daily_time.append(day_step.strftime('%Y-%m-%d'))
+        daily_temp_max.append(round(base_temp + 5.0 + random.uniform(-1, 1), 1))
+        daily_temp_min.append(round(base_temp - 5.0 + random.uniform(-1, 1), 1))
+        daily_codes.append(random.choice([0, 1, 2, 3, 51, 61]))
+        daily_sunrise.append(f"{day_step.strftime('%Y-%m-%d')}T06:05")
+        daily_sunset.append(f"{day_step.strftime('%Y-%m-%d')}T18:30")
+        daily_precip_max.append(random.randint(10, 60))
+
+    return {
+        'temperature': round(base_temp + random.uniform(-2, 2), 1),
+        'description': "Partly Cloudy (Simulated Fallback)",
+        'weather_code': 2,
+        'humidity': random.randint(60, 75),
+        'wind_speed': round(12.5 + random.uniform(-2, 2), 1),
+        'city': city,
+        'is_day': is_day_now,
+        'fallback': True,
+        'hourly': {
+            'time': hourly_time,
+            'temperature_2m': hourly_temps,
+            'relative_humidity_2m': hourly_humidity,
+            'precipitation_probability': hourly_precip,
+            'weather_code': hourly_codes,
+            'is_day': hourly_is_day
+        },
+        'daily': {
+            'time': daily_time,
+            'temperature_2m_max': daily_temp_max,
+            'temperature_2m_min': daily_temp_min,
+            'weather_code': daily_codes,
+            'sunrise': daily_sunrise,
+            'sunset': daily_sunset,
+            'precipitation_probability_max': daily_precip_max
+        }
+    }
+
 @travel_bp.route('/current', methods=['GET'], strict_slashes=False)
 def get_current_weather():
     """Fetch current weather from Open-Meteo"""
@@ -796,7 +878,7 @@ def get_current_weather():
         
         res = requests.get(url, timeout=10)
         if res.status_code != 200:
-            return jsonify({'error': 'Weather service error'}), 502
+            raise requests.exceptions.RequestException(f"Open-Meteo returned status code {res.status_code}")
             
         data = res.json()
         
@@ -815,8 +897,13 @@ def get_current_weather():
         
         return jsonify(weather_data)
     except Exception as e:
-        logger.error(f"Weather Fetch Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.warning(f"Weather Fetch Timeout/Error: {e}. Falling back to realistic simulated weather data for {city}.")
+        try:
+            fallback_data = generate_mock_weather(lat, lon, city)
+            return jsonify(fallback_data), 200
+        except Exception as fallback_err:
+            logger.error(f"Weather Fallback Generator Error: {fallback_err}")
+            return jsonify({'error': str(e)}), 500
 
 @travel_bp.route('/predict_fast', methods=['POST'])
 def predict_weather_fast():
