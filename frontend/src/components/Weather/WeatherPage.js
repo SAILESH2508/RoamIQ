@@ -237,9 +237,23 @@ const WeatherPage = ({ locationName }) => {
                     try {
                         const revRes = await axios.get(`/api/travel/reverse?lat=${lat}&lon=${lon}`);
                         if (revRes.data) {
-                            const address = revRes.data.address;
-                            city = address.city || address.town || address.village || address.county || 'Current Location';
-                            if (address.country) city += `, ${address.country}`;
+                                                        const addr = revRes.data.address;
+                            const suburb = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet;
+                            const main = addr.city || addr.town || addr.municipality;
+                            
+                            if (suburb) {
+                                const isCoimbatore = (addr.county && addr.county.toLowerCase().includes('coimbatore')) || 
+                                                   (main && main.toLowerCase().includes('coimbatore')) ||
+                                                   (addr.city && addr.city.toLowerCase().includes('coimbatore'));
+                                if (isCoimbatore && suburb.toLowerCase() !== 'coimbatore') {
+                                    city = `${suburb}, Coimbatore`;
+                                } else {
+                                    city = main ? `${suburb}, ${main}` : suburb;
+                                }
+                            } else {
+                                city = main || addr.county || 'Current Location';
+                            }
+                            if (addr.country) city += `, ${addr.country}`;
                         }
                     } catch (e) {
                         console.error("Reverse geocoding failed", e);

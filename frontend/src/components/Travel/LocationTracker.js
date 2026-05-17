@@ -20,7 +20,27 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
                 const geoRes = await api.get(
                     `/api/travel/reverse?lat=${lat}&lon=${lng}`
                 );
-                address = geoRes.data.display_name || address;
+                if (geoRes.data && geoRes.data.address) {
+                    const addr = geoRes.data.address;
+                    const suburb = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet;
+                    const main = addr.city || addr.town || addr.municipality;
+                    
+                    if (suburb) {
+                        const isCoimbatore = (addr.county && addr.county.toLowerCase().includes('coimbatore')) || 
+                                           (main && main.toLowerCase().includes('coimbatore')) ||
+                                           (addr.city && addr.city.toLowerCase().includes('coimbatore'));
+                        if (isCoimbatore && suburb.toLowerCase() !== 'coimbatore') {
+                            address = `${suburb}, Coimbatore`;
+                        } else {
+                            address = main ? `${suburb}, ${main}` : suburb;
+                        }
+                    } else {
+                        address = main || addr.county || 'Unknown Location';
+                    }
+                    if (addr.country) address += `, ${addr.country}`;
+                } else {
+                    address = geoRes.data.display_name || address;
+                }
             } catch (err) {
                 console.warn('Reverse geocoding failed', err);
             }
