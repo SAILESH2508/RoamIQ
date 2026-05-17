@@ -43,7 +43,7 @@ const Home = () => {
                         <div className="d-flex justify-content-center gap-3 flex-wrap">
                             {user ? (
                                 <>
-                                    <Link to="/dashboard" className="btn btn-primary px-5 py-3 rounded-pill fw-black shadow-lg border-0" style={{ background: 'var(--primary-gradient)', fontSize: '1.1rem' }}>
+                                    <Link to="/dashboard" className="btn-premium px-5 py-3 fs-5 shadow-lg">
                                         GO TO DASHBOARD <FaArrowRight />
                                     </Link>
                                     <Link to="/ai" className="btn-premium-outline">
