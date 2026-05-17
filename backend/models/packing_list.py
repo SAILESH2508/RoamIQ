@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.extensions import db
 
 class PackingItem(db.Model):
@@ -13,7 +13,7 @@ class PackingItem(db.Model):
     is_packed = db.Column(db.Boolean, default=False)
     quantity = db.Column(db.Integer, default=1)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
 
     def to_dict(self):
         return {

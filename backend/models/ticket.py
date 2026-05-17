@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from backend.extensions import db
 
@@ -23,7 +23,7 @@ class Ticket(db.Model):
     currency = db.Column(db.String(3), default='USD')
     
     # Timing
-    booking_date = db.Column(db.DateTime, default=datetime.utcnow)
+    booking_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     valid_from = db.Column(db.DateTime)
     valid_until = db.Column(db.DateTime)
     
@@ -31,8 +31,8 @@ class Ticket(db.Model):
     status = db.Column(db.String(20), default='confirmed')  # 'confirmed', 'cancelled', 'used', 'expired'
     additional_info = db.Column(db.Text)  # JSON string for platform specific details
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     def set_additional_info(self, data):
         """Set info as JSON"""

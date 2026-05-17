@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Form, Modal, Badge, Spinner } from 'react-bootstrap';
 import { FaPlus, FaTrash } from 'react-icons/fa';
 import axios from '../../api/axios';
@@ -6,13 +6,13 @@ import { toast } from 'react-toastify';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
 const ExpenseTracker = ({ tripId }) => {
-    const { formatCurrency, currentCurrency } = useCurrency();
+    const { formatCurrency, currentCurrency, convertToUSD } = useCurrency();
     const [expenses, setExpenses] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Fetch expenses on load or currency change
-    React.useEffect(() => {
+    // Fetch expenses on load or tripId change
+    useEffect(() => {
         const fetchExpenses = async () => {
             try {
                 const params = tripId ? { trip_id: tripId } : {};
@@ -25,12 +25,39 @@ const ExpenseTracker = ({ tripId }) => {
         };
         fetchExpenses();
     }, [tripId]);
+
     const [newExpense, setNewExpense] = useState({
         category: 'Other',
         amount: '',
         date: new Date().toISOString().split('T')[0],
         description: ''
     });
+
+    // AI Categorization Debounce — calls the chat endpoint as a lightweight workaround
+    // since a dedicated /api/ai/categorize/expense route does not exist
+    useEffect(() => {
+        if (newExpense.description.length > 3) {
+            const timeoutId = setTimeout(async () => {
+                try {
+                    const res = await axios.post('/api/ai/chat', {
+                        message: `Categorize this expense in one word (Food/Transport/Flights/Hotel/Activities/Other): "${newExpense.description}" amount: ${newExpense.amount}. Reply with ONLY the category word.`,
+                        save_to_history: false
+                    });
+                    const raw = res.data?.ai_response?.trim();
+                    const validCategories = ['Food', 'Transport', 'Flights', 'Hotel', 'Activities', 'Other'];
+                    // Match case-insensitively
+                    const matched = validCategories.find(c => raw?.toLowerCase().includes(c.toLowerCase()));
+                    if (matched) {
+                        setNewExpense(prev => ({ ...prev, category: matched }));
+                    }
+                } catch (err) {
+                    // Silently fail — AI categorization is a nice-to-have
+                    console.debug('AI categorization skipped:', err.message);
+                }
+            }, 1000);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [newExpense.description, newExpense.amount]);
 
     const handleAddExpense = async () => {
         if (!newExpense.amount || !newExpense.description) return;
@@ -54,7 +81,7 @@ const ExpenseTracker = ({ tripId }) => {
                 date: new Date().toISOString().split('T')[0],
                 description: ''
             });
-        } catch (error) {
+        } catch {
             toast.error('Failed to save expense');
         } finally {
             setIsLoading(false);
@@ -67,12 +94,11 @@ const ExpenseTracker = ({ tripId }) => {
             await axios.delete(`/api/travel/expenses/${id}`);
             setExpenses(expenses.filter(e => e.id !== id));
             toast.info('Expense deleted');
-        } catch (error) {
+        } catch {
             toast.error('Failed to delete expense');
         }
     };
 
-    const { convertToUSD } = useCurrency();
     const total = expenses.reduce((sum, e) => {
         const amountInUSD = convertToUSD(e.amount, e.currency);
         return sum + amountInUSD;
@@ -146,21 +172,6 @@ const ExpenseTracker = ({ tripId }) => {
                                 value={newExpense.description}
                                 onChange={(e) => {
                                     setNewExpense({ ...newExpense, description: e.target.value });
-                                    const desc = e.target.value;
-                                    if (desc.length > 3) {
-                                        const timeoutId = setTimeout(async () => {
-                                            try {
-                                                const res = await axios.post('/api/ai/categorize/expense', {
-                                                    description: desc,
-                                                    amount: newExpense.amount
-                                                });
-                                                if (res.data.category) {
-                                                    setNewExpense(prev => ({ ...prev, category: res.data.category }));
-                                                }
-                                            } catch (err) { }
-                                        }, 1000);
-                                        return () => clearTimeout(timeoutId);
-                                    }
                                 }}
                             />
                         </Form.Group>

@@ -77,7 +77,23 @@ def create_app():
     from backend.extensions import db, jwt, cors
     db.init_app(app)
     jwt.init_app(app)
-    cors.init_app(app)
+    
+    # Manually inject CORS headers to all responses for bulletproof development CORS
+    @app.after_request
+    def inject_cors_headers(response):
+        origin = request.headers.get('Origin', '')
+        app.logger.info(f"[CORS HOOK] Request path: {request.path}, Origin: {origin}")
+        allowed_origins = ['http://localhost:3000', 'http://127.0.0.1:3000']
+        if origin in allowed_origins:
+            app.logger.info("[CORS HOOK] Match found! Injecting CORS headers.")
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Max-Age'] = '600'
+        else:
+            app.logger.info("[CORS HOOK] No match or no origin header.")
+        return response
     
     # JWT Error Handlers for Debugging
     @jwt.expired_token_loader
@@ -97,6 +113,34 @@ def create_app():
     
 
     
+    # Handle CORS preflight BEFORE JWT runs — must be outside app_context block
+    @app.before_request
+    def handle_options_preflight():
+        """Short-circuit all OPTIONS preflight requests before JWT validation."""
+        if request.method == 'OPTIONS':
+            response = app.make_default_options_response()
+            # Manually inject CORS headers so the browser accepts the preflight
+            origin = request.headers.get('Origin', '')
+            allowed_origins = ['http://localhost:3000', 'http://127.0.0.1:3000']
+            if origin in allowed_origins:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Max-Age'] = '600'
+            return response
+
+    @app.before_request
+    def log_request_info():
+        app.logger.info('Headers: %s', request.headers)
+        app.logger.info('Body: %s', request.get_data())
+        app.logger.info('Path: %s', request.path)
+
+    @app.after_request
+    def log_response_info(response):
+        app.logger.info('Response Status: %s', response.status)
+        return response
+
     # Register blueprints
     with app.app_context():
         from backend.routes.auth import auth_bp

@@ -71,17 +71,13 @@ class LLMProvider:
         
         self.models = {
             'gpt-4o-mini': ModelConfig(ModelProvider.OPENAI, 'gpt-4o-mini', max_tokens=16000, cost_per_1k_tokens=0.00015),
-            'gpt-4-turbo': ModelConfig(ModelProvider.OPENAI, 'gpt-4-turbo-preview', max_tokens=4000, cost_per_1k_tokens=0.03),
-            'gpt-3.5-turbo': ModelConfig(ModelProvider.OPENAI, 'gpt-3.5-turbo', max_tokens=4000, cost_per_1k_tokens=0.002),
+            'gpt-4o': ModelConfig(ModelProvider.OPENAI, 'gpt-4o', max_tokens=4000, cost_per_1k_tokens=0.03),
             'gemini-1.5-flash': ModelConfig(ModelProvider.GOOGLE, 'gemini-1.5-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
-            'gemini-1.5-flash-8b': ModelConfig(ModelProvider.GOOGLE, 'gemini-1.5-flash-8b', max_tokens=8192, cost_per_1k_tokens=0.0001),
-            'gemini-1.5-pro': ModelConfig(ModelProvider.GOOGLE, 'gemini-1.5-pro', max_tokens=2048, cost_per_1k_tokens=0.001),
+            'gemini-1.5-pro': ModelConfig(ModelProvider.GOOGLE, 'gemini-1.5-pro', max_tokens=8192, cost_per_1k_tokens=0.001),
             'gemini-2.0-flash': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.0-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
-            'gemini-2.0-flash-lite': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.0-flash-lite', max_tokens=8192, cost_per_1k_tokens=0.0005),
-            'claude-3-sonnet': ModelConfig(ModelProvider.ANTHROPIC, 'claude-3-sonnet-20240229', max_tokens=4000, cost_per_1k_tokens=0.015),
-            'command-r-plus': ModelConfig(ModelProvider.COHERE, 'command-a-03-2025', max_tokens=4000, cost_per_1k_tokens=0.0005),
-            'mistral-7b': ModelConfig(ModelProvider.HUGGINGFACE, 'mistralai/Mistral-7B-Instruct-v0.2', max_tokens=2048),
-            'llama3': ModelConfig(ModelProvider.OLLAMA, 'llama3', max_tokens=4000),
+            'gemini-2.0-flash-v2': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.0-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
+            'claude-3-5-sonnet': ModelConfig(ModelProvider.ANTHROPIC, 'claude-3-5-sonnet-20240620', max_tokens=8192, cost_per_1k_tokens=0.015),
+            'command-r-plus': ModelConfig(ModelProvider.COHERE, 'command-r-plus-08-2024', max_tokens=4000, cost_per_1k_tokens=0.0005),
             'offline-mock': ModelConfig(ModelProvider.MOCK, 'offline-mock', max_tokens=2000)
         }
         self._load_keys()
@@ -131,7 +127,14 @@ class LLMProvider:
 
                 if provider == ModelProvider.OPENAI and self.openai_keys:
                     key = self.openai_keys[key_idx % len(self.openai_keys)]
-                    client = AsyncOpenAI(api_key=key)
+                    try:
+                        # Attempt to initialize with http_client to avoid 'proxies' argument bug in some httpx versions
+                        import httpx
+                        http_client = httpx.AsyncClient(verify=False)
+                        client = AsyncOpenAI(api_key=key, http_client=http_client)
+                    except Exception as e:
+                        logger.warning(f"Failed to init OpenAI with custom http_client: {e}. Trying default.")
+                        client = AsyncOpenAI(api_key=key)
                 elif provider == ModelProvider.GOOGLE and self.google_keys:
                     key = self.google_keys[key_idx % len(self.google_keys)]
                     # google-genai client handles its own loop or uses current
@@ -141,6 +144,7 @@ class LLMProvider:
                     client = anthropic.AsyncAnthropic(api_key=key)
                 elif provider == ModelProvider.COHERE and self.cohere_keys:
                     key = self.cohere_keys[key_idx % len(self.cohere_keys)]
+                    # Use newest Cohere client
                     client = cohere.AsyncClient(api_key=key)
                 
                 if client:
@@ -163,10 +167,9 @@ class LLMProvider:
     ) -> Union[str, Dict[str, Any]]:
         # Backend-only choice for the "best" available model
         if model_name is None:
-            # Prefer 2.0 Flash for best speed/intelligence balance, fallback to 1.5 Flash
-            model_name = os.getenv('DEFAULT_LLM_MODEL', 'gemini-2.0-flash')
+            model_name = os.getenv('DEFAULT_LLM_MODEL', 'gemini-1.5-flash')
             if model_name not in self.models:
-                model_name = 'gemini-1.5-flash'
+                model_name = 'gemini-2.0-flash'
             
         if tried_models is None:
             tried_models = []
@@ -256,7 +259,7 @@ class LLMProvider:
                 return f"AI system failure. All fallbacks exhausted. Final error: {e}"
 
     def _select_best_fallback(self, tried_models: List[str]) -> Optional[str]:
-        chain = ['gemini-2.0-flash', 'gpt-4o-mini', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'command-r-plus', 'offline-mock']
+        chain = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gpt-4o-mini', 'command-r-plus', 'offline-mock']
         for model in chain:
             if model not in tried_models:
                 p = self._get_provider_for_model(model)

@@ -11,17 +11,21 @@ import { toast } from 'react-toastify';
 import ReactMarkdown from 'react-markdown';
 import { v4 as uuidv4 } from 'uuid';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { useData } from '../../contexts/DataContext';
 
 const GenAIHub = () => {
     const { currentCurrency, formatCurrency } = useCurrency();
+    const { trips, fetchTrips, refreshData } = useData();
 
     // Core State
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [conversationId, setConversationId] = useState(() => localStorage.getItem('roamiq_active_conv_id') || uuidv4());
-    const [conversations, setConversations] = useState([]);
-    const [upcomingTrip, setUpcomingTrip] = useState(null);
+    const [conversations, setConversations] = useState(() => {
+        const cached = localStorage.getItem('roamiq_cached_conversations');
+        return cached ? JSON.parse(cached) : [];
+    });
 
     // Feature States
     const [selectedFile, setSelectedFile] = useState(null);
@@ -47,25 +51,17 @@ const GenAIHub = () => {
         try {
             const res = await axios.get('/api/ai/chat/conversations');
             setConversations(res.data);
+            localStorage.setItem('roamiq_cached_conversations', JSON.stringify(res.data));
         } catch (err) {
             console.error("Failed to fetch conversations", err);
         }
     }, []);
 
-    const fetchUpcomingTrip = React.useCallback(async () => {
-        try {
-            const res = await axios.get('/api/travel/trips');
-            const trips = res.data.trips || [];
-            if (trips.length > 0) {
-                // Find the first upcoming trip
-                const now = new Date();
-                const next = trips.find(t => t.start_date && new Date(t.start_date) > now) || trips[0];
-                setUpcomingTrip(next);
-            }
-        } catch (err) {
-            console.error("Failed to fetch upcoming trip", err);
-        }
-    }, []);
+    const upcomingTrip = React.useMemo(() => {
+        if (!trips || trips.length === 0) return null;
+        const now = new Date();
+        return trips.find(t => t.start_date && new Date(t.start_date) > now) || trips[0];
+    }, [trips]);
 
     const loadConversation = React.useCallback(async (id) => {
         setIsLoading(true);
@@ -80,7 +76,7 @@ const GenAIHub = () => {
             setMessages(formatted.length > 0 ? formatted : []);
             setConversationId(id);
             localStorage.setItem('roamiq_active_conv_id', id);
-        } catch (err) {
+        } catch {
             toast.error("Failed to load chat history");
         } finally {
             setIsLoading(false);
@@ -89,12 +85,12 @@ const GenAIHub = () => {
 
     useEffect(() => {
         fetchConversations();
-        fetchUpcomingTrip();
+        fetchTrips();
         const existingId = localStorage.getItem('roamiq_active_conv_id');
         if (existingId && messages.length === 0) {
             loadConversation(existingId);
         }
-    }, [fetchConversations, fetchUpcomingTrip, loadConversation, messages.length]);
+    }, [fetchConversations, fetchTrips, loadConversation, messages.length]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -105,13 +101,17 @@ const GenAIHub = () => {
         if (!window.confirm("Delete this adventure? This cannot be undone.")) return;
         try {
             await axios.delete(`/api/ai/chat/conversations/${id}`);
-            setConversations(prev => prev.filter(c => c.id !== id));
+            setConversations(prev => {
+                const updated = prev.filter(c => c.id !== id);
+                localStorage.setItem('roamiq_cached_conversations', JSON.stringify(updated));
+                return updated;
+            });
             if (id === conversationId) {
                 setMessages([]);
                 setConversationId(uuidv4());
             }
             toast.success("Adventure deleted.");
-        } catch (err) {
+        } catch {
             toast.error("Failed to delete.");
         }
     };
@@ -120,25 +120,44 @@ const GenAIHub = () => {
         const welcome = {
             id: 'welcome-' + Date.now(),
             type: 'ai',
-            content: `Hello! I'm **AURA**, your RoamIQ AI Studio assistant. 🌍\n\nI can help you plan complex itineraries, analyze travel receipts, or summarize PDF documents. How can I assist with your next adventure today?`,
+            content: `Hello! I'm **RoamIQ AI**, your intelligent travel assistant. 🌍\n\nI can help you plan complex itineraries, analyze travel receipts, or summarize PDF documents. How can I assist with your next adventure today?`,
             timestamp: new Date()
         };
         setMessages([welcome]);
     }, []);
 
+    // Show welcome message only when messages list becomes empty (new chat or cleared).
+    // Using messages.length as a primitive avoids re-running on every message object change.
+    const messagesLength = messages.length;
     useEffect(() => {
-        if (messages.length === 0 && !isLoading) {
+        if (messagesLength === 0 && !isLoading) {
             sendWelcomeMessage();
         }
-    }, [messages.length, isLoading, sendWelcomeMessage]);
+    }, [messagesLength, isLoading, sendWelcomeMessage]);
+
+    // Cleanup blob URLs when component unmounts
+    useEffect(() => {
+        return () => {
+            messages.forEach(msg => {
+                if (msg.image && msg.image.startsWith('blob:')) {
+                    URL.revokeObjectURL(msg.image);
+                }
+            });
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleRenameConversation = async (id) => {
         if (!editTitle.trim()) return setEditingConvId(null);
         try {
             await axios.patch(`/api/ai/chat/conversations/${id}`, { title: editTitle });
-            setConversations(prev => prev.map(c => c.id === id ? { ...c, title: editTitle } : c));
+            setConversations(prev => {
+                const updated = prev.map(c => c.id === id ? { ...c, title: editTitle } : c);
+                localStorage.setItem('roamiq_cached_conversations', JSON.stringify(updated));
+                return updated;
+            });
             setEditingConvId(null);
-        } catch (err) {
+        } catch {
             toast.error("Failed to rename.");
         }
     };
@@ -162,6 +181,12 @@ const GenAIHub = () => {
         const currentFile = selectedFile;
 
         if (typeof overrideText !== 'string') setInputMessage('');
+        
+        // Clean up previous file preview if it exists
+        if (filePreview) {
+            URL.revokeObjectURL(filePreview);
+        }
+        
         setSelectedFile(null);
         setFilePreview(null);
 
@@ -189,7 +214,7 @@ const GenAIHub = () => {
                     addMessage(res.data.summary || res.data.caption || "File analyzed. How can I help with this?", 'ai');
                 }
                 fetchConversations();
-            } catch (err) {
+            } catch {
                 addMessage("Failed to analyze file.", 'ai', { error: true });
             } finally {
                 setIsLoading(false);
@@ -208,7 +233,7 @@ const GenAIHub = () => {
             });
             addMessage(res.data.ai_response, 'ai');
             fetchConversations();
-        } catch (err) {
+        } catch {
             addMessage("I'm having trouble connecting right now.", 'ai', { error: true });
         } finally {
             setIsLoading(false);
@@ -244,7 +269,7 @@ const GenAIHub = () => {
                             addMessage(res.data.ai_response, 'ai');
                             fetchConversations();
                         }
-                    } catch (err) {
+                    } catch {
                         toast.error("Voice processing failed.");
                     } finally {
                         setIsLoading(false);
@@ -274,110 +299,138 @@ const GenAIHub = () => {
                 end_date: saveData.endDate,
                 budget: saveData.budget || 0,
                 status: 'Planned',
-                notes: `Generated from AI Conversation: ${conversationId}`
+                notes: `Generated from AI Conversation: ${conversationId}`,
+                itinerary: saveData.itinerary // Include the extracted itinerary
             });
             toast.success("Trip saved to Adventures! ✈️");
             setShowSaveModal(false);
-            fetchUpcomingTrip();
-        } catch (err) {
+            refreshData();
+        } catch {
             toast.error("Failed to save trip.");
         }
     };
 
     return (
-        <div className="chat-interface animate-fade-in" style={{ fontWeight: '700' }}>
+        <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: 'var(--bg-gradient-main)', fontFamily: "'Outfit', sans-serif" }}>
             {/* Sidebar: AI Studio Controls */}
-            <aside className="chat-history shadow-sm glass-panel d-flex flex-column" style={{ overflow: 'hidden' }}>
+            <aside className="dashboard-sidebar d-flex flex-column" style={{ 
+                width: '240px', 
+                background: 'var(--sidebar-bg)', 
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                position: 'fixed',
+                left: 0,
+                top: '60px', 
+                bottom: 0,
+                height: 'calc(100vh - 60px)',
+                zIndex: 1500,
+                padding: '24px 16px',
+                borderRight: '1px solid var(--glass-border-weather)',
+                boxShadow: '4px 0 24px rgba(0, 0, 0, 0.02)',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+            }}>
                 {/* 1. LOCATION */}
-                <div className="mb-3">
-                    <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.75rem' }}>Live Location</h6>
-                    <div className="glass-card p-2 bg-white shadow-sm border-0">
+                <div className="mb-4">
+                    <div className="glass-card p-1 shadow-sm rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                         <LocationTracker />
                     </div>
                 </div>
 
                 {/* 2. VIEW HISTORY & 3. NEW CHAT */}
-                <div className="d-flex flex-column gap-2 mb-3">
+                <div className="d-flex flex-column gap-2 mb-4">
                     <Button 
                         variant="light" 
-                        className="text-start small fw-black py-2 border-0 glass-panel hover-bg-light"
+                        className="text-start small fw-black py-2 rounded-3 hover-bg-light shadow-sm"
                         onClick={() => setShowHistoryModal(true)}
-                        style={{ fontSize: '0.85rem' }}
+                        style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
                     >
                         <FaSync className="text-primary me-2" /> VIEW HISTORY
                     </Button>
                     <Button 
-                        className="btn-premium w-100 justify-content-center shadow-sm py-2 small fw-black" 
+                        className="btn-premium w-100 justify-content-center shadow-sm py-2 small fw-black rounded-3" 
                         onClick={() => { setConversationId(uuidv4()); setMessages([]); localStorage.removeItem('roamiq_active_conv_id'); }}
-                        style={{ fontSize: '0.85rem' }}
+                        style={{ fontSize: '0.8rem' }}
                     >
                         <FaPlus className="me-2" /> NEW ADVENTURE
                     </Button>
                 </div>
 
                 {/* 4. AI STUDIO TOOLS */}
-                <div className="mb-3">
-                    <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.75rem' }}>AI Studio Tools</h6>
-                    <div className="d-flex flex-column gap-1">
-                        <Button variant="light" className="text-start small fw-bold py-2 border-0 glass-panel hover-bg-light" onClick={() => setChecklistPrompt({ ...checkListPrompt, show: true })} style={{ fontSize: '0.85rem' }}>
+                <div className="mb-4">
+                    <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.65rem' }}>AI Studio Tools</h6>
+                    <div className="d-flex flex-column gap-2">
+                        <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={() => setChecklistPrompt({ ...checkListPrompt, show: true })} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                             <FaSuitcase className="text-primary me-2" /> Packing List
                         </Button>
-                        <Button variant="light" className="text-start small fw-bold py-2 border-0 glass-panel hover-bg-light" onClick={async () => {
+                        <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={async () => {
                             if (!upcomingTrip) return toast.info("Plan a trip first!");
                             try {
                                 const res = await axios.post('/api/ai/generate/postcard', { trip_id: upcomingTrip.id });
                                 addMessage("Here's a digital postcard for your trip!", 'ai', { type: 'postcard', data: res.data });
                             } catch (e) { toast.error("Failed to generate postcard."); }
-                        }} style={{ fontSize: '0.85rem' }}>
+                        }} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                             <FaImage className="text-primary me-2" /> AI Postcard
                         </Button>
-                        <Button variant="light" className="text-start small fw-bold py-2 border-0 glass-panel hover-bg-light" onClick={() => toast.info('Insights coming soon')} style={{ fontSize: '0.85rem' }}>
+                        <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={() => toast.info('Insights coming soon')} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                             <FaChartBar className="text-primary me-2" /> Travel Insights
                         </Button>
                     </div>
                 </div>
 
                 {/* 5. NEXT EXPEDITION */}
-                <div className="mt-auto pt-3 border-top">
+                <div className="mt-2 pt-3 border-top">
                     {upcomingTrip ? (
                         <>
-                            <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.75rem' }}>Next Expedition</h6>
-                            <div className="glass-card p-3 border-start border-primary border-3 bg-white shadow-sm hover-lift transition-all">
+                            <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.65rem' }}>Next Expedition</h6>
+                            <div className="glass-card p-3 border-start border-primary border-3 shadow-sm hover-lift transition-all rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', borderLeft: '3px solid var(--primary)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                                 <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <span className="fw-black text-dark small" style={{ fontSize: '0.9rem' }}>{upcomingTrip.destination}</span>
+                                    <span className="fw-black text-dark small" style={{ fontSize: '0.85rem', lineHeight: '1.2' }}>{upcomingTrip.title || upcomingTrip.destination}</span>
                                     <FaMapMarkedAlt className="text-primary opacity-50" size={14} />
                                 </div>
                                 <div className="d-flex align-items-center gap-2 mb-2">
                                     <FaCalendar className="text-muted" size={10} />
-                                    <span className="small text-muted fw-bold" style={{ fontSize: '0.75rem' }}>{new Date(upcomingTrip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <span className="small text-muted fw-bold" style={{ fontSize: '0.7rem' }}>{new Date(upcomingTrip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                                 </div>
                                 <div className="d-flex justify-content-between align-items-center">
-                                    <span className="small fw-bold text-primary" style={{ fontSize: '0.8rem' }}>{formatCurrency(upcomingTrip.budget)}</span>
-                                    <Badge bg="primary" className="rounded-pill bg-primary-gradient border-0" style={{ fontSize: '0.7rem', padding: '4px 10px' }}>{upcomingTrip.status}</Badge>
+                                    <span className="small fw-bold text-primary" style={{ fontSize: '0.75rem' }}>{formatCurrency(upcomingTrip.budget)}</span>
+                                    <Badge bg="primary" className="rounded-pill bg-primary-gradient border-0" style={{ fontSize: '0.65rem', padding: '4px 10px' }}>{upcomingTrip.status}</Badge>
                                 </div>
                             </div>
                         </>
                     ) : (
-                        <div className="text-center p-3 glass-panel opacity-50">
-                            <small className="fw-bold text-muted small" style={{ fontSize: '0.8rem' }}>No upcoming trips</small>
+                        <div className="text-center p-3 glass-panel opacity-50 rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)' }}>
+                            <small className="fw-bold text-muted small" style={{ fontSize: '0.75rem' }}>No upcoming trips</small>
                         </div>
                     )}
                 </div>
             </aside>
 
             {/* Main Chat Area */}
-            <main className="chat-messages shadow-sm">
+            <main className="chat-messages animate-fade-in" style={{ 
+                flex: 1, 
+                marginLeft: '240px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: 'calc(100vh - 60px)', 
+                background: 'transparent', 
+                border: 'none', 
+                borderRadius: 0, 
+                boxShadow: 'none' 
+            }}>
                 {/* Active Chat Header */}
-                <div className="p-3 border-bottom bg-white d-flex justify-content-between align-items-center glass-panel" style={{ zIndex: 10 }}>
+                <div className="p-3 bg-white d-flex justify-content-between align-items-center shadow-sm" style={{ zIndex: 10, borderBottom: '1px solid var(--glass-border-weather)' }}>
                     <div className="d-flex align-items-center gap-3">
-                        <div className="bg-primary-light p-2 rounded-circle">
-                            <FaRobot className="text-primary" size={18} />
+                        <div className="bg-primary p-2 rounded-circle shadow-sm border border-2" style={{ backgroundColor: 'var(--primary)', border: '2px solid var(--primary-dark)' }}>
+                            <FaRobot className="text-white" size={18} />
                         </div>
                         <div>
                             <h6 className="mb-0 fw-bold text-dark">
                                 {conversations.find(c => c.id === conversationId)?.title || "Current Adventure"}
                             </h6>
-                            <small className="text-muted x-small fw-bold text-uppercase">AI Assistant Online</small>
+                            <small className="text-muted x-small fw-bold text-uppercase" style={{ letterSpacing: '0.5px' }}>AI Assistant Online</small>
                         </div>
                     </div>
                     <div className="d-flex gap-2">
@@ -393,7 +446,7 @@ const GenAIHub = () => {
                     </div>
                 </div>
                 <div 
-                    className="messages-stream custom-scrollbar p-4 flex-grow-1" 
+                    className="messages-stream custom-scrollbar p-4 flex-grow-1 position-relative" 
                     style={{ 
                         backgroundImage: `linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.92)), url(/assets/ai-assistant.png)`,
                         backgroundSize: '300px',
@@ -402,22 +455,29 @@ const GenAIHub = () => {
                         backgroundAttachment: 'local'
                     }}
                 >
-                    {messages.length <= 1 && messages[0]?.id?.toString().includes('welcome') ? (
-                        <div className="m-auto text-center p-5 animate-fade-in" style={{ maxWidth: '600px' }}>
+                    <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-5" style={{ 
+                        zIndex: 0, 
+                        pointerEvents: 'none',
+                        opacity: messages.length > 1 ? 0.15 : 0.8,
+                        transition: 'opacity 0.3s ease'
+                    }}>
+                        <div className="text-center animate-fade-in" style={{ maxWidth: '600px' }}>
                             <div className="mb-5 animate-pop-up">
-                                <img 
-                                    src="/assets/ai-assistant.png" 
-                                    alt="AI Assistant" 
-                                    className="img-fluid rounded-4 shadow-lg hover-scale transition-all" 
-                                    style={{ maxHeight: '250px', border: '8px solid white' }} 
-                                />
+                                <div className="d-inline-block p-3 rounded-4" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                                    <img 
+                                        src="/assets/ai-assistant.png" 
+                                        alt="AI Assistant" 
+                                        className="img-fluid rounded-3 shadow" 
+                                        style={{ maxHeight: '230px' }} 
+                                    />
+                                </div>
                             </div>
-                            <h2 className="fw-black mb-3">RoamIQ Studio</h2>
-                            <p className="text-muted fs-5">Analyze receipts, plan itineraries, or summarize travel documents with AURA intelligence.</p>
+                            <h2 className="fw-black mb-3" style={{ color: 'var(--text-main)' }}>RoamIQ Studio</h2>
+                            <p className="fs-5" style={{ color: 'var(--text-muted)' }}>Analyze receipts, plan itineraries, or summarize travel documents with RoamIQ AI intelligence.</p>
                         </div>
-                    ) : (
-                        messages.map(msg => (
-                            <div key={msg.id} className={`d-flex ${msg.type === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-4 animate-fade-in`}>
+                    </div>
+                    {messages.map(msg => (
+                            <div key={msg.id} className={`d-flex ${msg.type === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-4 animate-fade-in`} style={{ position: 'relative', zIndex: 1 }}>
                                 <div className={`message-bubble ${msg.type === 'user' ? 'user-message shadow-sm' : 'ai-message border glass-panel bg-white bg-opacity-75'}`} style={{ maxWidth: '85%', borderRadius: '20px', backdropFilter: 'blur(10px)', fontWeight: '700' }}>
                                     {msg.image && <img src={msg.image} alt="Upload" className="img-fluid rounded-3 mb-2 shadow-sm" style={{ maxHeight: '300px' }} />}
                                     {msg.isPdf && (
@@ -435,9 +495,46 @@ const GenAIHub = () => {
                                     {msg.type === 'ai' && !msg.id.toString().includes('welcome') && (
                                         <div className="mt-3 pt-2 border-top border-light d-flex gap-2">
                                             <Button variant="light" className="x-small fw-bold py-1 px-2 border hover-bg-light" onClick={() => {
-                                                const lines = msg.content.split('\n');
-                                                const dest = lines[0].replace(/[#*]/g, '').trim();
-                                                setSaveData({ ...saveData, destination: dest, title: `${dest} Adventure` });
+                                                const content = msg.content;
+                                                
+                                                // Try to extract JSON itinerary
+                                                let extractedItinerary = null;
+                                                const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/({[\s\S]*"days"[\s\S]*})/);
+                                                
+                                                if (jsonMatch) {
+                                                    try {
+                                                        extractedItinerary = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                                                    } catch (e) {
+                                                        console.error("Failed to parse extracted JSON", e);
+                                                    }
+                                                }
+
+                                                const lines = content.split('\n');
+                                                let dest = extractedItinerary?.destination || extractedItinerary?.trip_title;
+                                                
+                                                if (!dest) {
+                                                    // Fallback: Try to find a clean destination from the first few lines
+                                                    let firstLine = lines[0].replace(/[#*]/g, '').trim();
+                                                    // Remove "Here's a...", "Plan for...", etc.
+                                                    dest = firstLine.replace(/^(Here's a|Plan for|Itinerary for|A condensed|Your trip to|Trip to)\s+/i, '')
+                                                                    .replace(/\s+(itinerary|keeping|budget|for).*$/i, '')
+                                                                    .replace(/,.*$/, '')
+                                                                    .trim();
+                                                }
+
+                                                if (!dest || dest.length < 2) {
+                                                    dest = 'New Adventure';
+                                                }
+
+                                                setSaveData({ 
+                                                    ...saveData, 
+                                                    destination: dest, 
+                                                    title: extractedItinerary?.trip_title || `${dest} Adventure`,
+                                                    startDate: '',
+                                                    endDate: '',
+                                                    budget: extractedItinerary?.estimated_total_cost || '',
+                                                    itinerary: extractedItinerary // Store it for saving
+                                                });
                                                 setShowSaveModal(true);
                                             }}>
                                                 SAVE PLAN
@@ -449,12 +546,11 @@ const GenAIHub = () => {
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    )}
+                        ))}
                     {isLoading && (
                         <div className="ai-message border glass-panel bg-white p-3 rounded-4 d-flex align-items-center gap-3 animate-pulse" style={{ width: 'fit-content' }}>
                             <Spinner animation="grow" size="sm" variant="primary" />
-                            <span className="small fw-bold text-muted" style={{ fontWeight: '700' }}>AURA is thinking...</span>
+                            <span className="small fw-bold text-muted" style={{ fontWeight: '700' }}>RoamIQ AI is thinking...</span>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
@@ -468,13 +564,15 @@ const GenAIHub = () => {
                             <Button variant="danger" size="sm" className="position-absolute top-0 end-0 rounded-circle p-0" style={{ width: '20px', height: '20px', marginTop: '-8px', marginRight: '-8px' }} onClick={() => { setSelectedFile(null); setFilePreview(null); }}><FaTimes size={10} /></Button>
                         </div>
                     )}
-                    {selectedFile && !filePreview && (
-                        <div className="bg-light p-2 rounded-3 d-inline-flex align-items-center gap-2 mb-2 ms-4 border shadow-sm">
-                            <FaFilePdf className="text-danger" />
-                            <span className="small fw-bold">{selectedFile.name}</span>
-                            <FaTimes className="text-muted clickable" size={12} onClick={() => setSelectedFile(null)} />
-                        </div>
-                    )}
+                            {selectedFile && !filePreview && (
+                                <div className="bg-light p-2 rounded-3 d-inline-flex align-items-center gap-2 mb-2 ms-4 border shadow-sm">
+                                    <FaFilePdf className="text-danger" />
+                                    <span className="small fw-bold">{selectedFile.name}</span>
+                                    <FaTimes className="text-muted clickable" size={12} onClick={() => {
+                                        setSelectedFile(null);
+                                    }} />
+                                </div>
+                            )}
                     
                     <Form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="px-2">
                         <div className="d-flex align-items-center gap-2 bg-light rounded-pill p-1 px-3 shadow-sm border focus-within-orange">
@@ -498,7 +596,7 @@ const GenAIHub = () => {
                             </Button>
 
                             <Form.Control 
-                                className="bg-transparent border-0 shadow-none py-2" 
+                                className="bg-transparent border-0 shadow-none py-2 flex-grow-1" 
                                 placeholder="Message RoamIQ..." 
                                 value={inputMessage} 
                                 onChange={(e) => setInputMessage(e.target.value)} 
@@ -518,7 +616,7 @@ const GenAIHub = () => {
 
                             <Button 
                                 type="submit" 
-                                className={`rounded-circle p-2 border-0 shadow-sm transition-all ${(!inputMessage.trim() && !selectedFile) || isLoading ? 'bg-secondary opacity-25' : 'bg-primary-gradient'}`}
+                                className={`rounded-circle p-2 border-0 shadow-sm transition-all flex-shrink-0 ${(!inputMessage.trim() && !selectedFile) || isLoading ? 'bg-secondary opacity-25' : 'bg-primary-gradient'}`}
                                 style={{ width: '40px', height: '40px' }}
                                 disabled={isLoading || (!inputMessage.trim() && !selectedFile)}
                             >

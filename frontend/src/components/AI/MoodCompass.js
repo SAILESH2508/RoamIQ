@@ -46,7 +46,7 @@ const MoodCompass = ({ compact = false }) => {
         <Card className={`glass-card border-0 overflow-hidden ${compact ? 'mb-0' : 'mb-4'}`}>
             <Card.Header className={`bg-transparent border-0 ${compact ? 'p-3 pb-0' : 'p-4 pb-0'}`}>
                 <h5 className="fw-bold mb-1">Mood Compass</h5>
-                {!compact && <p className="text-muted small">How are you feeling today? We'll match your vibe.</p>}
+                {!compact && <p className="text-muted small">How are you feeling today? We&apos;ll match your vibe.</p>}
             </Card.Header>
             <Card.Body className={compact ? 'p-3' : 'p-4'}>
                 <div className={`d-flex justify-content-between ${compact ? 'mb-3' : 'mb-4'} gap-2 overflow-auto pb-2`}>

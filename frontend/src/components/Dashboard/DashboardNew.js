@@ -1,85 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, ProgressBar } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { useData } from '../../contexts/DataContext';
 import {
-  FaMapMarkedAlt, FaCoins, FaGlobe, FaMapMarkerAlt, FaPlus, 
-  FaRegBell, FaCompass, FaChevronRight, FaClock, FaTrophy, 
-  FaHeart, FaShare, FaSearch, FaUserFriends, FaEdit, FaCloud,
-  FaTachometerAlt, FaImage
+  FaMapMarkedAlt, FaCoins, FaMapMarkerAlt,
+  FaRegBell, FaChevronRight, FaClock, FaSearch,
+  FaTachometerAlt, FaCalendar, FaPlus, FaEdit, FaTrophy, FaImage
 } from 'react-icons/fa';
 import axios from '../../api/axios';
 import MapWidget from './MapWidget';
+import LocationTracker from '../Travel/LocationTracker';
 import { motion } from 'framer-motion';
 
 const DashboardNew = () => {
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
-  const [trips, setTrips] = useState([]);
-  const [stats, setStats] = useState({
-    totalTrips: 0,
-    upcomingTrips: 0,
-    totalBudget: 0,
-    completedTrips: 0
-  });
+  const { trips, stats, recentActivities, fetchTrips } = useData();
+
+  const iconMap = {
+    FaPlus: FaPlus,
+    FaEdit: FaEdit,
+    FaTrophy: FaTrophy,
+    FaImage: FaImage
+  };
+
   const [userLocation, setUserLocation] = useState(null);
-  const [userCurrentLocation, setUserCurrentLocation] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [recentActivities, setRecentActivities] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [weatherData, setWeatherData] = useState(() => {
+    const cached = localStorage.getItem('roamiq-cached-current-weather');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return {
+          location: parsed.city,
+          temp: Math.round(parsed.temperature),
+          condition: parsed.condition,
+          code: parsed.weather_code || parsed.code || 0,
+          is_day: parsed.is_day !== undefined ? parsed.is_day : 1
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
 
-  const fetchTrips = React.useCallback(async () => {
+  const fetchWeatherForLocation = useCallback(async (lat, lng, name) => {
+    // Check cache validity (15 minutes cache limit)
+    const cacheTime = localStorage.getItem('roamiq-weather-cache-time');
+    const lastViewed = localStorage.getItem('roamiq-last-viewed-weather-location');
+    const cachedWeather = localStorage.getItem('roamiq-cached-current-weather');
+    
+    let isCacheValid = false;
+    if (cachedWeather && cacheTime && lastViewed) {
+      try {
+        const parsedLast = JSON.parse(lastViewed);
+        const age = Date.now() - parseInt(cacheTime);
+        const sameLoc = Math.abs(Number(parsedLast.lat) - Number(lat)) < 0.001 && 
+                        Math.abs(Number(parsedLast.lon) - Number(lng)) < 0.001;
+        if (age < 900000 && sameLoc) {
+          isCacheValid = true;
+        }
+      } catch (e) {
+        isCacheValid = false;
+      }
+    }
+
+    if (isCacheValid) {
+      return; // Skip fetch, since state is already initialized from cache!
+    }
+
     try {
-      const response = await axios.get('/api/travel/trips');
-      const tripsData = response.data.trips;
-      setTrips(tripsData);
-
-      const now = new Date();
-      const upcoming = tripsData.filter(trip => 
-        (trip.start_date && new Date(trip.start_date) > now) || 
-        (trip.status === 'planned' || trip.status === 'ongoing')
-      ).length;
-      const completed = tripsData.filter(trip => trip.status === 'completed').length;
-      const totalBudget = tripsData.reduce((sum, trip) => sum + (trip.budget || 0), 0);
-
-      setStats({
-        totalTrips: tripsData.length,
-        upcomingTrips: upcoming,
-        totalBudget: totalBudget,
-        completedTrips: completed
-      });
-
-      // Generate mock recent activities
-      const activities = [
-        { id: 1, type: 'trip_created', title: 'New adventure planned', time: '2 hours ago', icon: FaPlus, color: 'primary' },
-        { id: 2, type: 'trip_updated', title: 'Updated Tokyo itinerary', time: '5 hours ago', icon: FaEdit, color: 'primary' },
-        { id: 3, type: 'achievement', title: 'Earned Explorer Badge', time: '1 day ago', icon: FaTrophy, color: 'primary' },
-        { id: 4, type: 'social', title: 'Shared travel photos', time: '2 days ago', icon: FaImage, color: 'primary' }
-      ];
-      setRecentActivities(activities);
-
-      // Generate mock achievements
-      const mockAchievements = [
-        { id: 1, name: 'World Explorer', description: 'Visit 5+ countries', icon: FaGlobe, progress: 60, unlocked: false },
-        { id: 2, name: 'Budget Master', description: 'Stay under budget 3 times', icon: FaCoins, progress: 100, unlocked: true },
-        { id: 3, name: 'Adventure Seeker', description: 'Complete 10 trips', icon: FaCompass, progress: 70, unlocked: false },
-        { id: 4, name: 'Social Butterfly', description: 'Share 5 trips', icon: FaUserFriends, progress: 40, unlocked: false }
-      ];
-      setAchievements(mockAchievements);
-
-      // Mock weather data
-      setWeatherData({
-        location: 'New York',
-        temp: 72,
-        condition: 'Partly Cloudy',
-        icon: FaCloud,
-        humidity: 65,
-        wind: 12
-      });
-    } catch (error) {
-      console.error('Error fetching trips:', error);
+      const weatherRes = await axios.get(`/api/travel/current?lat=${lat}&lon=${lng}&city=${encodeURIComponent(name || 'Unknown Location')}`);
+      if (weatherRes.data) {
+        const weatherState = {
+          location: name,
+          temp: Math.round(weatherRes.data.temperature || 72),
+          condition: weatherRes.data.description || 'Clear Sky',
+          code: weatherRes.data.weather_code || 0,
+          is_day: weatherRes.data.is_day !== undefined ? weatherRes.data.is_day : 1
+        };
+        setWeatherData(weatherState);
+        
+        // Write to weather cache so they match!
+        localStorage.setItem('roamiq-cached-current-weather', JSON.stringify({
+            temperature: weatherState.temp,
+            condition: weatherState.condition,
+            weather_code: weatherState.code,
+            humidity: weatherRes.data.humidity || 60,
+            wind_speed: weatherRes.data.wind_speed || 10,
+            city: name,
+            is_day: weatherState.is_day,
+            hourly: weatherRes.data.hourly,
+            daily: weatherRes.data.daily
+        }));
+        localStorage.setItem('roamiq-cached-hourly-data', JSON.stringify(weatherRes.data.hourly));
+        localStorage.setItem('roamiq-cached-daily-data', JSON.stringify(weatherRes.data.daily));
+        localStorage.setItem('roamiq-weather-cache-time', Date.now().toString());
+        localStorage.setItem('roamiq-last-viewed-weather-location', JSON.stringify({ lat, lon: lng, city: name }));
+      }
+    } catch (e) {
+      console.error("Weather fetch failed", e);
     }
   }, []);
 
@@ -89,48 +114,13 @@ const DashboardNew = () => {
       setUserLocation(user.last_location);
     }
     
-    // Get user's current location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Reverse geocoding to get address
-          try {
-            const response = await axios.get(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
-              {
-                headers: { 'User-Agent': 'RoamIQ/1.0' }
-              }
-            );
-            
-            if (response.data) {
-              const address = response.data.address;
-              const locationName = address.city || address.town || address.village || address.county || 'Unknown Location';
-              const country = address.country || '';
-              
-              setUserCurrentLocation({
-                lat: latitude,
-                lng: longitude,
-                name: locationName,
-                country: country,
-                fullAddress: response.data.display_name || `${locationName}, ${country}`
-              });
-            }
-          } catch (error) {
-            console.error('Error getting location details:', error);
-            setLocationError('Unable to fetch location details');
-          }
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          setLocationError('Location access denied');
-        }
-      );
-    } else {
-      setLocationError('Geolocation not supported');
-    }
-  }, [fetchTrips, user]);
+    // Load initial location from cached or Coimbatore fallback
+    const cached = localStorage.getItem('roamiq-user-location');
+    const initialLoc = cached ? JSON.parse(cached) : { lat: 11.0168, lng: 76.9558, address: 'Coimbatore, Tamil Nadu, India' };
+    const locationName = initialLoc.address?.split(',')[0] || 'Coimbatore';
+    
+    fetchWeatherForLocation(initialLoc.lat, initialLoc.lng, locationName);
+  }, [fetchTrips, user, fetchWeatherForLocation]);
 
   const getStatusBadge = (status) => {
     const statusColors = {
@@ -148,8 +138,18 @@ const DashboardNew = () => {
   };
 
   const getFilteredTrips = () => {
-    if (filterStatus === 'all') return trips;
-    return trips.filter(trip => trip.status === filterStatus);
+    let filtered = trips;
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(trip => trip.status === filterStatus);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(trip =>
+        trip.title?.toLowerCase().includes(q) ||
+        trip.destination?.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
   };
 
   const getTripProgress = (trip) => {
@@ -163,165 +163,185 @@ const DashboardNew = () => {
   };
 
   return (
-    <div className="dashboard-layout animate-fade-in">
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: 'var(--bg-gradient-main)', color: 'var(--text-main-weather)', fontFamily: "'Outfit', sans-serif" }}>
       {/* Sidebar Navigation */}
-      <aside className="dashboard-sidebar shadow-sm py-2 px-3">
-        <div className="d-flex align-items-center gap-3 mb-4 p-3 bg-white border border-light rounded-4 shadow-sm mx-1">
-            <div className="bg-primary-gradient text-white rounded-circle d-flex align-items-center justify-content-center fw-black shadow-sm" style={{ width: '52px', height: '52px', fontSize: '20px' }}>
-                {user?.username?.charAt(0).toUpperCase()}
-            </div>
-            <div>
-                <h6 className="mb-0 fw-black text-dark" style={{ fontSize: '16px' }}>{user?.username}</h6>
-                <small className="text-primary fw-bold x-small" style={{ letterSpacing: '0.5px' }}>PRO EXPLORER</small>
-            </div>
-        </div>
+      <aside className="dashboard-sidebar d-flex flex-column" style={{ 
+          width: '240px', 
+          background: 'var(--sidebar-bg)', 
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          color: 'var(--text-main-weather)',
+          position: 'fixed',
+          left: 0,
+          top: '60px', 
+          bottom: 0,
+          height: 'calc(100vh - 60px)',
+          zIndex: 1500,
+          padding: '24px 20px',
+          borderRight: '1px solid var(--glass-border-weather)',
+          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.02)'
+      }}>
+          <div className="mb-4">
+              <h4 className="fw-black mb-1 text-dark text-truncate" style={{ fontSize: '1.4rem' }}>Welcome, {user?.username || 'Traveler'}!</h4>
+              <p className="fw-bold mb-3 small" style={{ color: 'var(--text-main-weather)', opacity: 0.7 }}>Command Center</p>
+              
+              <div className="d-flex flex-column gap-2">
+                  <div className="d-flex align-items-center gap-2 rounded-4 shadow-sm overflow-hidden" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                      <LocationTracker onUpdate={(loc) => {
+                          const name = loc.address?.split(',')[0] || 'Unknown Location';
+                          setUserCurrentLocation({
+                              lat: loc.lat,
+                              lng: loc.lng,
+                              name: name,
+                              country: '',
+                              fullAddress: loc.address
+                          });
+                          fetchWeatherForLocation(loc.lat, loc.lng, name);
+                      }} />
+                  </div>
+                  {weatherData && (
+                      <Link to="/weather" className="text-decoration-none">
+                          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-4 shadow-sm hover-lift transition-all" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                              <span className="fw-black text-dark" style={{ fontSize: '0.85rem' }}>{weatherData.temp}°C</span>
+                              <span className="text-muted fw-bold small text-truncate">{weatherData.condition}</span>
+                          </div>
+                      </Link>
+                  )}
+              </div>
+          </div>
 
-        <div className="mb-3">
-            <h6 className="text-muted fw-bold text-uppercase mb-3 px-1" style={{ letterSpacing: '1px', fontSize: '12px' }}>Command Center</h6>
+          <div className="mb-4">
+            <h6 className="fw-black text-uppercase mb-3 px-1" style={{ letterSpacing: '1px', fontSize: '10px', color: 'var(--text-main-weather)', opacity: 0.7 }}>Navigation</h6>
             <nav className="d-flex flex-column gap-2">
                 <button
                     onClick={() => setActiveTab('overview')}
-                    className={`sidebar-link-premium border-0 w-100 text-start py-3 px-3 d-flex align-items-center gap-3 ${activeTab === 'overview' ? 'active' : ''}`}
+                    className={`btn text-start py-2 px-3 d-flex align-items-center gap-3 rounded-4 fw-bold transition-all border-0 ${activeTab === 'overview' ? 'shadow-sm' : ''}`}
+                    style={{ background: activeTab === 'overview' ? 'var(--accent-weather)' : 'transparent', color: activeTab === 'overview' ? '#fff' : 'var(--text-main-weather)', fontSize: '0.9rem' }}
                 >
-                    <div className={`p-2 rounded-3 ${activeTab === 'overview' ? 'bg-primary text-white' : 'bg-light text-muted'}`}>
-                        <FaTachometerAlt size={18} />
-                    </div>
-                    <span className="fw-bold">Overview</span>
+                    <FaTachometerAlt size={16} />
+                    <span>Overview</span>
                 </button>
                 <button
                     onClick={() => setActiveTab('trips')}
-                    className={`sidebar-link-premium border-0 w-100 text-start py-3 px-3 d-flex align-items-center gap-3 ${activeTab === 'trips' ? 'active' : ''}`}
+                    className={`btn text-start py-2 px-3 d-flex align-items-center gap-3 rounded-4 fw-bold transition-all border-0 ${activeTab === 'trips' ? 'shadow-sm' : ''}`}
+                    style={{ background: activeTab === 'trips' ? 'var(--accent-weather)' : 'transparent', color: activeTab === 'trips' ? '#fff' : 'var(--text-main-weather)', fontSize: '0.9rem' }}
                 >
-                    <div className={`p-2 rounded-3 ${activeTab === 'trips' ? 'bg-primary text-white' : 'bg-light text-muted'}`}>
-                        <FaMapMarkedAlt size={18} />
-                    </div>
-                    <span className="fw-bold">Adventures</span>
+                    <FaMapMarkedAlt size={16} />
+                    <span>Adventures</span>
                 </button>
             </nav>
-        </div>
+          </div>
 
-        <div className="mt-auto">
-            {/* User Location Widget */}
-            {userCurrentLocation && (
-                <div className="glass-card p-3 border-0 bg-white shadow-sm mb-3">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                        <div>
-                            <div className="d-flex align-items-center gap-2 mb-1">
-                                <FaMapMarkerAlt className="text-success" size={12} />
-                                <span className="text-muted fw-bold text-uppercase x-small" style={{ letterSpacing: '1px' }}>Current Region</span>
+          <div className="mt-auto pt-3 border-top">
+             {(() => {
+                 const now = new Date();
+                 const nextTrip = trips.find(t => (t.start_date && new Date(t.start_date) > now) || t.status === 'planned' || t.status === 'ongoing');
+                 
+                 return nextTrip ? (
+                     <>
+                        <h6 className="text-muted small fw-black text-uppercase mb-2 px-1" style={{ letterSpacing: '2px', fontSize: '0.75rem' }}>Next Expedition</h6>
+                        <div className="glass-card p-3 border-start border-primary border-3 shadow-sm hover-lift transition-all rounded-3" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', borderLeft: '3px solid var(--primary)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                <span className="fw-black text-dark text-truncate" style={{ fontSize: '0.85rem', maxWidth: '140px' }}>{nextTrip.title || nextTrip.destination}</span>
+                                <FaMapMarkedAlt className="text-primary opacity-50 flex-shrink-0" size={12} />
                             </div>
-                            <h6 className="mb-0 fw-bold" style={{ fontSize: '15px' }}>{userCurrentLocation.name}</h6>
-                            <small className="text-muted" style={{ fontSize: '12px' }}>{userCurrentLocation.country}</small>
+                            <div className="d-flex align-items-center gap-2 mb-2">
+                                <FaCalendar className="text-muted" size={10} />
+                                <span className="small text-muted fw-bold" style={{ fontSize: '0.75rem' }}>{nextTrip.start_date ? new Date(nextTrip.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Flexible'}</span>
+                            </div>
+                            <div className="d-flex justify-content-between align-items-center mt-1">
+                                <span className="fw-black text-primary" style={{ fontSize: '0.8rem' }}>{formatCurrency(nextTrip.budget || 0)}</span>
+                                <Badge bg="primary" className="rounded-pill bg-primary-gradient border-0" style={{ fontSize: '0.6rem', padding: '4px 8px' }}>{nextTrip.status}</Badge>
+                            </div>
                         </div>
+                     </>
+                 ) : (
+                    <div className="text-center p-3 opacity-50">
+                        <small className="fw-bold text-muted" style={{ fontSize: '0.8rem' }}>No upcoming trips</small>
                     </div>
-                </div>
-            )}
-
-
-
-
-
-            <div className="glass-card p-3 border-0" style={{ background: 'linear-gradient(135deg, #fff 0%, #fff7ed 100%)', boxShadow: '0 10px 30px rgba(255, 122, 0, 0.15)' }}>
-                <div className="d-flex align-items-center gap-3 mb-3">
-                    <div className="bg-primary text-white rounded-circle p-2 shadow-sm d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
-                        <FaCompass size={20} className="animate-pulse" />
-                    </div>
-                    <div>
-                        <h6 className="mb-0 fw-black text-dark" style={{ fontSize: '15px' }}>Live Tracking</h6>
-                        <small className="text-muted fw-bold" style={{ fontSize: '11px' }}>ACTIVE EXPEDITION</small>
-                    </div>
-                </div>
-                <Link to="/ai" className="btn-premium py-3 w-100 fw-bold justify-content-center shadow-sm" style={{ fontSize: '14px', borderRadius: '16px' }}>
-                    START NEW TRIP <FaPlus size={12} />
-                </Link>
-            </div>
-        </div>
+                 );
+             })()}
+          </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="dashboard-main custom-scrollbar">
+      <main className="dashboard-main-content animate-fade-in custom-scrollbar pt-4" style={{ flex: 1, marginLeft: '240px', padding: '0', height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column', overflow: activeTab === 'overview' ? 'hidden' : 'auto' }}>
+        <div className="px-4 pb-2 pt-2 d-flex flex-column h-100">
+        <div className="d-flex justify-content-between align-items-center mb-0 flex-wrap gap-3">
+            {/* Header Content can be placed here if needed, but for now we've moved it to the sidebar */}
+            <div className="flex-grow-1"></div>
+        </div>
+
         {activeTab === 'overview' && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="flex-grow-1 d-flex flex-column pb-0">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="flex-grow-1 d-flex flex-column" style={{ minHeight: 0 }}>
                 {/* Stats Row */}
                 <div className="row g-3 mb-3">
                     <div className="col-lg-4 col-md-6">
-                        <div className="stat-card-premium p-3 d-flex align-items-center gap-3" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-                            <div className="bg-primary-soft p-2 rounded-3 shadow-inner text-primary" style={{ minWidth: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <FaMapMarkedAlt size={22} />
+                        <div className="glass-panel p-4 d-flex align-items-center gap-3 shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid var(--glass-border-weather)' }}>
+                            <div className="p-3 rounded-circle text-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 107, 0, 0.1)' }}>
+                                <FaMapMarkedAlt size={28} />
                             </div>
                             <div>
-                                <h2 className="fw-black mb-0" style={{ fontSize: '24px', lineHeight: 1.2 }}>{stats.totalTrips}</h2>
-                                <h6 className="text-muted fw-bold text-uppercase mb-0 x-small" style={{ letterSpacing: '1px' }}>Adventures</h6>
+                                <h2 className="fw-black mb-0" style={{ fontSize: '28px', lineHeight: 1.2, color: 'var(--text-main-weather)' }}>{stats.totalTrips}</h2>
+                                <h6 className="fw-bold text-uppercase mb-0" style={{ letterSpacing: '1px', fontSize: '0.75rem', color: 'var(--accent-weather)' }}>Adventures</h6>
                             </div>
                         </div>
                     </div>
                     <div className="col-lg-4 col-md-6">
-                        <div className="stat-card-premium p-3 d-flex align-items-center gap-3" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-                            <div className="bg-success bg-opacity-10 p-2 rounded-3 shadow-inner text-success" style={{ minWidth: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <FaCoins size={22} />
+                        <div className="glass-panel p-4 d-flex align-items-center gap-3 shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid var(--glass-border-weather)' }}>
+                            <div className="bg-success bg-opacity-10 p-3 rounded-circle text-success" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <FaCoins size={28} />
                             </div>
                             <div>
-                                <h2 className="fw-black mb-0" style={{ fontSize: '22px', lineHeight: 1.2 }}>{formatCurrency(stats.totalBudget)}</h2>
-                                <h6 className="text-muted fw-bold text-uppercase mb-0 x-small" style={{ letterSpacing: '1px' }}>Investment</h6>
+                                <h2 className="fw-black mb-0" style={{ fontSize: '24px', lineHeight: 1.2, color: 'var(--text-main-weather)' }}>{formatCurrency(stats.totalBudget)}</h2>
+                                <h6 className="fw-bold text-uppercase mb-0" style={{ letterSpacing: '1px', fontSize: '0.75rem', color: '#22c55e' }}>Investment</h6>
                             </div>
                         </div>
                     </div>
                     <div className="col-lg-4 col-md-6">
-                        <div className="stat-card-premium p-3 d-flex align-items-center gap-3" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-                            <div className="bg-warning bg-opacity-10 p-2 rounded-3 shadow-inner text-warning" style={{ minWidth: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <FaRegBell size={22} />
+                        <div className="glass-panel p-4 d-flex align-items-center gap-3 shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid var(--glass-border-weather)' }}>
+                            <div className="bg-warning bg-opacity-10 p-3 rounded-circle text-warning" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <FaRegBell size={28} />
                             </div>
                             <div>
-                                <h2 className="fw-black mb-0" style={{ fontSize: '24px', lineHeight: 1.2 }}>{stats.upcomingTrips}</h2>
-                                <h6 className="text-muted fw-bold text-uppercase mb-0 x-small" style={{ letterSpacing: '1px' }}>Upcoming</h6>
+                                <h2 className="fw-black mb-0" style={{ fontSize: '28px', lineHeight: 1.2, color: 'var(--text-main-weather)' }}>{stats.upcomingTrips}</h2>
+                                <h6 className="fw-bold text-uppercase mb-0" style={{ letterSpacing: '1px', fontSize: '0.75rem', color: '#eab308' }}>Upcoming</h6>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="row g-3 flex-grow-1 mb-0" style={{ minHeight: '300px' }}>
+                <div className="row g-3 flex-grow-1 mb-0" style={{ minHeight: 0 }}>
                     {/* Live Navigation Widget */}
-                    <div className="col-lg-8">
-                        <div className="glass-card mb-0 overflow-hidden border-0 shadow-lg h-100 d-flex flex-column">
-                            <div className="p-3 border-bottom bg-white d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h4 className="mb-0 fw-black d-flex align-items-center gap-3" style={{ fontSize: '24px' }}>
-                                        <FaGlobe className="text-primary" size={24} /> Live Navigation Hub
-                                    </h4>
-                                    <small className="text-muted fw-bold" style={{ fontSize: '13px' }}>Tracking {stats.totalTrips} coordinates</small>
-                                </div>
-                                <div className="d-flex align-items-center gap-2">
-                                    <span className="text-primary fw-bold" style={{ fontSize: '12px', letterSpacing: '0.5px' }}>LIVE</span>
-                                </div>
-                            </div>
-                            <div className="flex-grow-1 w-100">
-                                <MapWidget trips={trips} userLocation={userLocation} fillContainer={true} />
-                            </div>
-                        </div>
+                    <div className="col-lg-8 d-flex flex-column">
+                        <MapWidget trips={trips} userLocation={userLocation} fillContainer={true} />
                     </div>
                     
                     {/* Recent Activities */}
-                    <div className="col-lg-4">
-                        <div className="glass-card mb-0 overflow-hidden border-0 shadow-lg h-100 d-flex flex-column bg-white">
-                            <div className="p-3 border-bottom d-flex align-items-center gap-3">
-                                <div className="bg-primary-soft p-2 rounded-circle text-primary">
+                    <div className="col-lg-4 d-flex flex-column">
+                        <div className="glass-panel overflow-hidden border-0 shadow-sm h-100 d-flex flex-column" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '32px', border: '1px solid var(--glass-border-weather)' }}>
+                            <div className="p-4 border-bottom d-flex align-items-center gap-3" style={{ borderColor: 'var(--glass-border-weather)' }}>
+                                <div className="p-2 rounded-circle" style={{ background: 'var(--accent-weather)', color: '#fff' }}>
                                     <FaClock size={18} />
                                 </div>
-                                <h5 className="mb-0 fw-black" style={{ fontSize: '18px' }}>Recent Activity</h5>
+                                <h5 className="mb-0 fw-black" style={{ fontSize: '18px', color: 'var(--text-main-weather)' }}>Recent Activity</h5>
                             </div>
-                            <div className="p-3 flex-grow-1 overflow-auto custom-scrollbar">
+                            <div className="p-4 flex-grow-1 overflow-auto custom-scrollbar">
                                 <div className="d-flex flex-column gap-3">
-                                    {recentActivities.map(activity => (
-                                        <div key={activity.id} className="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-light transition-all border border-light bg-light bg-opacity-10">
-                                            <div className="bg-primary-soft p-2 rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '42px', height: '42px', minWidth: '42px' }}>
-                                                <activity.icon className="text-primary" size={18} />
+                                    {recentActivities.map(activity => {
+                                        const IconComponent = iconMap[activity.icon] || FaRegBell;
+                                        return (
+                                            <div key={activity.id} className="d-flex align-items-center gap-3 p-3 rounded-4 transition-all" style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                                <div className="p-2 rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{ width: '42px', height: '42px', minWidth: '42px', background: '#fff' }}>
+                                                    <IconComponent style={{ color: 'var(--accent-weather)' }} size={18} />
+                                                </div>
+                                                <div className="overflow-hidden">
+                                                    <h6 className="mb-0 fw-black text-truncate" style={{ fontSize: '14px', color: 'var(--text-main-weather)' }}>{activity.title}</h6>
+                                                    <small className="fw-bold x-small" style={{ color: 'var(--text-main-weather)', opacity: 0.6 }}>{activity.time}</small>
+                                                </div>
                                             </div>
-                                            <div className="overflow-hidden">
-                                                <h6 className="mb-0 fw-black text-dark text-truncate" style={{ fontSize: '14px' }}>{activity.title}</h6>
-                                                <small className="text-muted fw-bold x-small">{activity.time}</small>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -367,25 +387,27 @@ const DashboardNew = () => {
 
                 <div className="card-grid">
                     {getFilteredTrips().length === 0 ? (
-                        <div className="text-center py-5 glass-card col-span-full border-0 shadow-lg">
+                        <div className="text-center py-5 glass-panel col-span-full border-0 shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '32px', border: '1px solid var(--glass-border-weather)' }}>
                             <div className="mb-4">
                                 <img src="/assets/empty-trips.png" alt="No Trips" className="img-fluid rounded-4" style={{ maxHeight: '280px', opacity: 0.9 }} />
                             </div>
-                            <h3 className="text-dark fw-black" style={{ fontSize: '28px' }}>No adventures found</h3>
-                            <p className="text-muted mb-4 mx-auto" style={{ maxWidth: '450px', fontSize: '16px' }}>Try adjusting your search or filters to find your perfect getaway.</p>
-                            <Link to="/ai" className="btn-premium" style={{ fontSize: '16px', padding: '14px 32px' }}>PLAN NEW ADVENTURE</Link>
+                            <div className="p-5 text-center text-white rounded-bottom-4" style={{ background: 'var(--accent-weather)' }}>
+                                <h2 className="fw-black mb-3">READY FOR YOUR NEXT ADVENTURE?</h2>
+                                <p className="opacity-90 fw-bold mb-4">Let our AI orchestrate your perfect travel experience</p>
+                                <Link to="/ai" className="btn btn-light shadow-lg border-0" style={{ fontSize: '16px', padding: '14px 32px', color: 'var(--accent-weather)', borderRadius: '50px', fontWeight: '900' }}>PLAN NEW ADVENTURE</Link>
+                            </div>
                         </div>
                     ) : getFilteredTrips().map(trip => (
                         <Link key={trip.id} to={`/trips/${trip.id}`} className="text-decoration-none">
-                            <div className="stat-card-premium h-100 group flex-column align-items-stretch" style={{ gap: '0' }}>
+                            <div className="glass-panel p-4 h-100 group flex-column align-items-stretch shadow-sm hover-lift transition-all" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid var(--glass-border-weather)' }}>
                                 <div className="d-flex justify-content-between mb-4 w-100">
                                     <Badge bg={getStatusBadge(trip.status)} className="rounded-pill px-3 py-2 fw-bold text-uppercase" style={{ fontSize: '11px', letterSpacing: '1px' }}>{trip.status}</Badge>
-                                    <span className="text-muted fw-bold" style={{ fontSize: '14px' }}>{formatDate(trip.start_date)}</span>
+                                    <span className="fw-bold" style={{ fontSize: '14px', color: 'var(--text-main-weather)', opacity: 0.7 }}>{formatDate(trip.start_date)}</span>
                                 </div>
-                                <h3 className="fw-black text-dark mb-3 group-hover-text-primary transition-all text-truncate w-100" style={{ fontSize: '20px' }}>{trip.title}</h3>
-                                <div className="d-flex align-items-center gap-2 mb-3 text-muted fw-bold w-100">
-                                    <div className="bg-primary-soft p-2 rounded-circle">
-                                        <FaMapMarkerAlt className="text-primary" size={14} />
+                                <h3 className="fw-black mb-3 transition-all text-truncate w-100" style={{ fontSize: '20px', color: 'var(--text-main-weather)' }}>{trip.title}</h3>
+                                <div className="d-flex align-items-center gap-2 mb-3 fw-bold w-100" style={{ color: 'var(--text-main-weather)', opacity: 0.8 }}>
+                                    <div className="p-2 rounded-circle" style={{ background: 'rgba(0,0,0,0.05)' }}>
+                                        <FaMapMarkerAlt style={{ color: 'var(--accent-weather)' }} size={14} />
                                     </div>
                                     <span style={{ fontSize: '15px' }}>{trip.destination}</span>
                                 </div>
@@ -394,28 +416,24 @@ const DashboardNew = () => {
                                 {trip.status === 'ongoing' && (
                                     <div className="mb-3">
                                         <div className="d-flex justify-content-between mb-1">
-                                            <small className="text-muted fw-bold" style={{ fontSize: '11px' }}>Trip Progress</small>
-                                            <small className="text-muted fw-bold" style={{ fontSize: '11px' }}>{getTripProgress(trip)}%</small>
+                                            <small className="fw-bold" style={{ fontSize: '11px', color: 'var(--text-main-weather)', opacity: 0.7 }}>Trip Progress</small>
+                                            <small className="fw-bold" style={{ fontSize: '11px', color: 'var(--text-main-weather)' }}>{getTripProgress(trip)}%</small>
                                         </div>
-                                        <ProgressBar now={getTripProgress(trip)} variant="primary" style={{ height: '6px' }} />
+                                        <ProgressBar now={getTripProgress(trip)} style={{ height: '6px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                                            <div className="progress-bar" style={{ width: `${getTripProgress(trip)}%`, backgroundColor: 'var(--accent-weather)' }}></div>
+                                        </ProgressBar>
                                     </div>
                                 )}
                                 
-                                <div className="mt-auto pt-4 border-top border-light d-flex justify-content-between align-items-center">
+                                <div className="mt-auto pt-4 border-top d-flex justify-content-between align-items-center" style={{ borderColor: 'var(--glass-border-weather) !important' }}>
                                     <div>
-                                        <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '1px' }}>Investment</small>
-                                        <span className="fw-black text-dark" style={{ fontSize: '20px' }}>{formatCurrency(trip.budget)}</span>
+                                        <small className="d-block text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '1px', color: 'var(--text-main-weather)', opacity: 0.6 }}>Investment</small>
+                                        <span className="fw-black" style={{ fontSize: '20px', color: 'var(--text-main-weather)' }}>{formatCurrency(trip.budget)}</span>
                                     </div>
                                     <div className="d-flex gap-2">
-                                        <button className="btn btn-sm btn-outline-secondary rounded-circle p-2" style={{ width: '36px', height: '36px' }}>
-                                            <FaHeart size={14} />
-                                        </button>
-                                        <button className="btn btn-sm btn-outline-secondary rounded-circle p-2" style={{ width: '36px', height: '36px' }}>
-                                            <FaShare size={14} />
-                                        </button>
-                                        <div className="bg-primary text-white rounded-circle p-2 opacity-0 group-hover-opacity-100 transform translate-x-2 group-hover-translate-x-0 transition-all shadow-sm">
+                                        <button className="btn btn-sm rounded-circle p-2" style={{ width: '36px', height: '36px', background: 'rgba(0,0,0,0.05)', color: 'var(--text-main-weather)' }}>
                                             <FaChevronRight size={14} />
-                                        </div>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -424,6 +442,7 @@ const DashboardNew = () => {
                 </div>
             </motion.div>
         )}
+        </div>
       </main>
     </div>
   );

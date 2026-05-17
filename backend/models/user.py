@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import bcrypt
 import json
 from backend.extensions import db
@@ -19,8 +19,8 @@ class User(db.Model):
     date_of_birth = db.Column(db.Date)
     preferred_currency = db.Column(db.String(3), default='INR') # Global currency support
     last_location = db.Column(db.Text)  # JSON string format {"lat": float, "lng": float, "updated_at": "ISOString"}
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     # Relationships
     preferences = db.relationship('UserPreference', backref='user', lazy=True, cascade='all, delete-orphan')

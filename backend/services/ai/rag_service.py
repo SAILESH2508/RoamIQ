@@ -37,7 +37,7 @@ class RAGService:
             # Note: For real embeddings we'd need a model, using chromadb's default for now
             # Run blocking query in a thread to keep async loop responsive
             import asyncio
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             results = await loop.run_in_executor(
                 None, 
                 lambda: self.collections[collection].query(

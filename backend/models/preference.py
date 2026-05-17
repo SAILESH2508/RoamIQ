@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from backend.extensions import db
 
@@ -30,8 +30,8 @@ class UserPreference(db.Model):
     accessibility_needs = db.Column(db.Text)   # JSON string
     sustainability_priority = db.Column(db.Boolean, default=False)
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     def set_dietary_restrictions(self, restrictions_list):
         """Set dietary restrictions as JSON"""

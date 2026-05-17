@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from backend.extensions import db
 
@@ -38,8 +38,8 @@ class Trip(db.Model):
     sustainability_score = db.Column(db.Float)
     safety_alerts = db.Column(db.Text)  # JSON string
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     def set_itinerary(self, itinerary_data):
         """Set itinerary as JSON"""

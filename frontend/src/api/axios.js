@@ -4,10 +4,15 @@ import axios from 'axios';
 // Get the API URL from environment variables
 // In development, this is empty (uses proxy)
 // In production, this should be your Render backend URL (e.g., https://roamiq-backend.onrender.com)
-const API_URL = process.env.REACT_APP_API_URL || '';
+// In development, we talk directly to localhost:5000 to bypass proxy issues
+// In production, use the environment variable
+const API_URL = process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:5000' 
+    : (process.env.REACT_APP_API_URL || '');
 
 const instance = axios.create({
     baseURL: API_URL,
+    withCredentials: true, // Ensure cookies/session are sent
     headers: {
         'Content-Type': 'application/json',
     },
@@ -20,6 +25,7 @@ instance.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
     },
     (error) => {

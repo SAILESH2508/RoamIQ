@@ -124,13 +124,13 @@ const Profile = () => {
       <Row className="justify-content-center">
         <Col lg={10}>
           {/* Profile Header Card */}
-          <div className="glass-card overflow-hidden mb-5 border-0 shadow-lg">
-            <div className="bg-primary-gradient p-5 text-center text-white position-relative rounded-top-4">
+          <div className="glass-card overflow-hidden mb-5 border-0 shadow-lg" style={{ borderRadius: '32px' }}>
+            <div className="p-5 text-center text-white position-relative rounded-top-4" style={{ background: 'var(--primary-gradient)' }}>
               <div className="position-relative z-index-1">
                 <div className="mb-4 position-relative d-inline-block">
                   <div className="bg-white rounded-circle p-1 shadow-lg">
-                    <div className="bg-primary-gradient text-white rounded-circle d-flex align-items-center justify-content-center fw-black shadow-inner" style={{ width: '100px', height: '100px', fontSize: '2.5rem' }}>
-                      {user?.username.charAt(0).toUpperCase()}
+                    <div className="text-white rounded-circle d-flex align-items-center justify-content-center fw-black shadow-inner" style={{ width: '100px', height: '100px', fontSize: '2.5rem', background: 'var(--primary-gradient)' }}>
+                      {user?.username?.charAt(0).toUpperCase()}
                     </div>
                   </div>
                   <Button variant="light" className="position-absolute bottom-0 end-0 rounded-circle shadow-sm p-2 border-0 hover-scale">

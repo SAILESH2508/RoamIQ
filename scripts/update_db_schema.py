@@ -18,14 +18,13 @@ def update_db():
         
         if 'lat' not in columns:
             cursor.execute("ALTER TABLE trips ADD COLUMN lat FLOAT;")
-        else:
-            
+        
         if 'lng' not in columns:
             cursor.execute("ALTER TABLE trips ADD COLUMN lng FLOAT;")
-        else:
             
         conn.commit()
     except Exception as e:
+        print(f"Error updating database: {e}")
     finally:
         conn.close()
 

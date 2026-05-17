@@ -1,6 +1,6 @@
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from backend.extensions import db
 from backend.models.trip import Trip
@@ -81,7 +81,7 @@ def add_expense(user_id: int, trip_id: int, title: str, amount: float, category:
             description=title,
             amount=amount,
             category=category,
-            date=datetime.utcnow()
+            date=datetime.now(timezone.utc)
         )
         db.session.add(new_expense)
         db.session.commit()

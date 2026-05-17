@@ -32,14 +32,19 @@ def get_mood_history():
 
 @mood_bp.route('/recommendations', methods=['POST'])
 @jwt_required()
-async def get_recommendations():
+def get_recommendations():
     try:
         data = request.get_json()
         mood = data.get('mood', 'neutral')
         energy = data.get('energy', 'medium')
         
         from backend.services.ai_service import ai_service
-        recommendations = await ai_service.get_mood_recommendations(mood, energy)
+        import asyncio
+        loop = asyncio.new_event_loop()
+        recommendations = loop.run_until_complete(
+            ai_service.get_mood_recommendations(mood, energy)
+        )
+        loop.close()
         
         return jsonify({
             'recommendations': recommendations

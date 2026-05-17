@@ -72,14 +72,13 @@ def validate_api_key(api_key, secret_key):
         return False
     
     try:
-        # Simple HMAC validation (implement your own logic)
         expected = hmac.new(
             secret_key.encode(),
-            'roamiq_api'.encode(),
+            b'roamiq_api',
             hashlib.sha256
         ).hexdigest()
         return hmac.compare_digest(api_key, expected)
-    except:
+    except Exception:
         return False
 
 def security_headers(f):

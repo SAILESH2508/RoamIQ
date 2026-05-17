@@ -6,6 +6,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { DataProvider } from './contexts/DataContext';
 import Navbar from './components/Navbar';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
@@ -53,10 +55,12 @@ function PublicRoute({ children }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <CurrencyProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <div className="App">
+    <ThemeProvider>
+      <AuthProvider>
+        <CurrencyProvider>
+          <DataProvider>
+            <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <div className="App">
             <Navbar />
             <main className="main-content">
               <Routes>
@@ -120,8 +124,10 @@ function App() {
             />
           </div>
         </Router>
+      </DataProvider>
       </CurrencyProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -62,7 +62,7 @@ const TicketManager = ({ tripId }) => {
                 booking_reference: '',
                 confirmation_number: ''
             });
-        } catch (error) {
+        } catch {
             toast.error('Failed to add ticket');
         } finally {
             setIsLoading(false);
@@ -75,7 +75,7 @@ const TicketManager = ({ tripId }) => {
             await axios.delete(`/api/travel/tickets/${id}`);
             setTickets(tickets.filter(t => t.id !== id));
             toast.info('Ticket deleted');
-        } catch (error) {
+        } catch {
             toast.error('Failed to delete ticket');
         }
     };

@@ -11,7 +11,7 @@ import {
     FaMapMarkerAlt
 } from 'react-icons/fa';
 
-const ItineraryView = ({ itinerary, tripDuration }) => {
+const ItineraryView = ({ itinerary }) => {
     const { formatCurrency } = useCurrency();
 
     // Friendly empty state

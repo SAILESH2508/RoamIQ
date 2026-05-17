@@ -63,7 +63,7 @@ class AIService:
                             logger.error(f"History fetch failed: {e}")
                             return []
 
-                return await asyncio.get_event_loop().run_in_executor(None, _fetch_history)
+                return await asyncio.get_running_loop().run_in_executor(None, _fetch_history)
 
             async def get_trip_context():
                 """Get user's trip context for better AI responses"""
@@ -99,7 +99,7 @@ class AIService:
                             logger.error(f"Trip context fetch failed: {e}")
                             return ""
 
-                return await asyncio.get_event_loop().run_in_executor(None, _fetch_trips)
+                return await asyncio.get_running_loop().run_in_executor(None, _fetch_trips)
 
             async def get_rag_context():
                 # Skip RAG context for internal system actions (like trip extraction) to maximize speed
@@ -144,14 +144,21 @@ class AIService:
                          db.session.add(user_msg)
                          db.session.commit()
                  
-                 await asyncio.get_event_loop().run_in_executor(None, _save_user_msg)
+                 await asyncio.get_running_loop().run_in_executor(None, _save_user_msg)
 
             # 4. System Prompt
             system_prompt = (
                 "You are RoamIQ, a professional travel orchestrator. "
                 "Help users plan trips, book tickets, manage expenses, and generate reports. "
                 f"ALWAYS use {currency} for any financial estimates or costs. "
-                "Be concise and focus on immediate travel needs. "
+                "IMPORTANT: If you are generating a travel plan or itinerary, you MUST ALWAYS include a structured JSON block at the end of your response wrapped in ```json ... ``` tags. "
+                "The JSON must follow this format: "
+                "{\"trip_title\": \"...\", \"destination\": \"...\", \"estimated_total_cost\": 0, \"days\": [...]}. "
+                "This allows the system to save the trip correctly. "
+                "IMPORTANT COST RULES: "
+                "1. Keep all travel estimates and costs highly realistic and BUDGET-FRIENDLY. Users find current estimates too expensive. "
+                "2. For any 'NEARBY' or 'LOCAL' spots/trips, the total cost MUST NEVER EXCEED 10,000 RS. "
+                "3. Prioritize affordable options unless the user explicitly asks for luxury. "
                 "IMPORTANT: If the user's recent trips are shown in context, use that information "
                 "instead of asking for destinations or trip details that are already known. "
                 "When creating packing lists or itineraries, reference the specific destinations "
@@ -203,7 +210,7 @@ class AIService:
                                         with app.app_context():
                                             return tool_func(**args)
                                             
-                                    result = await asyncio.get_event_loop().run_in_executor(None, _run_tool)
+                                    result = await asyncio.get_running_loop().run_in_executor(None, _run_tool)
                                 
                                 return {
                                     "function_response": {
@@ -260,7 +267,7 @@ class AIService:
                          db.session.add(ai_msg)
                          db.session.commit()
                  
-                 await asyncio.get_event_loop().run_in_executor(None, _save_ai_msg)
+                 await asyncio.get_running_loop().run_in_executor(None, _save_ai_msg)
 
             mood = self._basic_mood_analysis(str(message))
 
@@ -296,10 +303,17 @@ class AIService:
         """Generate a structured itinerary."""
         prompt = f"""Create a {days}-day itinerary for {destination} with a {budget} budget.
         Preferences: {json.dumps(preferences or {})}
+        
+        COST CONSTRAINTS:
+        - Keep costs realistic and budget-friendly.
+        - If this is a nearby/local spot, the total estimated cost MUST NOT EXCEED 10,000 RS.
+        - Provide estimated_cost for each activity.
+        
         Return ONLY a JSON object with:
         {{
             "trip_title": "string",
             "summary": "string",
+            "estimated_total_cost": number,
             "days": [{{ "day": 1, "title": "string", "activities": [{{ "time": "string", "activity": "string", "description": "string", "type": "string", "estimated_cost": 0 }}] }}]
         }}
         """
@@ -642,7 +656,7 @@ class AIService:
         return {
             "postcard_text": message,
             "destination": trip.destination,
-            "signature": f"Sent from RoamIQ by {trip.user_id}"
+            "signature": f"Sent from RoamIQ by {trip.user.username if trip.user else 'Traveler'}"
         }
 
     async def update_trip_with_ai(

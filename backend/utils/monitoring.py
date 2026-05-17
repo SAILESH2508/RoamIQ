@@ -128,7 +128,7 @@ class PerformanceMonitor:
             from backend.extensions import db
             db.session.execute('SELECT 1')
             db_status = 'healthy'
-        except:
+        except Exception:
             db_status = 'unhealthy'
         
         # Check system resources
@@ -186,10 +186,5 @@ def init_monitoring(app):
     def metrics():
         """Prometheus metrics endpoint"""
         return monitor.get_metrics(), 200, {'Content-Type': 'text/plain'}
-    
-    @app.route('/api/health')
-    def health():
-        """Health check endpoint"""
-        return monitor.get_health_status()
     
     logger.info("Monitoring initialized")

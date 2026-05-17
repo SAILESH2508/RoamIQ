@@ -95,7 +95,7 @@ const Login = () => {
 
                 <div className="text-center mt-5">
                   <p className="mb-0 text-muted small fw-bold">
-                    DON'T HAVE AN ACCOUNT?{' '}
+                    DON&apos;T HAVE AN ACCOUNT?{' '}
                     <Link to="/register" className="text-primary text-decoration-none">
                       SIGN UP
                     </Link>

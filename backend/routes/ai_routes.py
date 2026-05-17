@@ -44,7 +44,8 @@ async def chat_with_ai():
         validate_required_fields(data, ['message'])
         
         message = data['message']
-        model = data.get('model', 'gemini-1.5-flash')
+        import os
+        model = data.get('model', os.getenv('DEFAULT_LLM_MODEL', 'gemini-1.5-flash'))
         conversation_id = data.get('conversation_id')
         currency = data.get('currency', 'USD')
         save_to_history = data.get('save_to_history', True)
@@ -120,12 +121,13 @@ def get_conversations():
         logger.debug(f"Fetching conversations for user_id: {user_id}")
         
         # Robust query: get latest message per conversation using max(id)
-        # Re-restoring filter now that debugging is complete
+        # Exclude 'title' role messages so they don't appear as the last message
         conversations = ChatMessage.query.filter(
             ChatMessage.user_id == user_id,
+            ChatMessage.role != 'title',
             ChatMessage.id.in_(
                 db.session.query(func.max(ChatMessage.id))
-                .filter(ChatMessage.user_id == user_id)
+                .filter(ChatMessage.user_id == user_id, ChatMessage.role != 'title')
                 .group_by(ChatMessage.conversation_id)
             )
         ).order_by(ChatMessage.timestamp.desc()).all()
@@ -134,13 +136,21 @@ def get_conversations():
         
         results = []
         for conv in conversations:
-            # Try to get the first user message as the title
-            first_msg = ChatMessage.query.filter_by(
-                conversation_id=conv.conversation_id, 
-                role='user'
-            ).order_by(ChatMessage.timestamp.asc()).first()
+            # Check for a custom title stored as a 'title' role message
+            title_msg = ChatMessage.query.filter_by(
+                conversation_id=conv.conversation_id,
+                role='title'
+            ).first()
             
-            title = first_msg.content[:40] + "..." if first_msg and len(first_msg.content) > 40 else (first_msg.content if first_msg else "New Chat")
+            if title_msg:
+                title = title_msg.content
+            else:
+                # Fall back to first user message as title
+                first_msg = ChatMessage.query.filter_by(
+                    conversation_id=conv.conversation_id, 
+                    role='user'
+                ).order_by(ChatMessage.timestamp.asc()).first()
+                title = first_msg.content[:40] + "..." if first_msg and len(first_msg.content) > 40 else (first_msg.content if first_msg else "New Chat")
             
             results.append({
                 'id': conv.conversation_id,
@@ -181,12 +191,12 @@ def delete_conversation(conversation_id):
 @jwt_required()
 @api_error_handler
 def rename_conversation(conversation_id):
-    """Rename a conversation by updating its title (derived from custom logic or stored title)."""
+    """Rename a conversation by storing a special title message."""
     try:
         from backend.models.chat_message import ChatMessage
         from backend.extensions import db
         data = request.get_json()
-        new_title = data.get('title')
+        new_title = data.get('title', '').strip()
         
         if not new_title:
             return jsonify({'error': 'Title is required'}), 400
@@ -194,14 +204,37 @@ def rename_conversation(conversation_id):
         user_identity = get_jwt_identity()
         user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
         
-        # In this simplified model, we don't have a separate Conversation table, 
-        # so we'll store the title in a special 'system' message or just return success 
-        # if the frontend wants to handle it locally for now.
-        # However, to make it persistent, we should ideally have a title field.
-        # For now, let's just confirm the endpoint exists so the frontend can call it.
+        # Verify the conversation belongs to this user
+        exists = ChatMessage.query.filter_by(
+            conversation_id=conversation_id,
+            user_id=user_id
+        ).first()
         
+        if not exists:
+            return jsonify({'error': 'Conversation not found'}), 404
+        
+        # Upsert a special 'title' role message to persist the custom name
+        title_msg = ChatMessage.query.filter_by(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role='title'
+        ).first()
+        
+        if title_msg:
+            title_msg.content = new_title
+        else:
+            title_msg = ChatMessage(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                role='title',
+                content=new_title
+            )
+            db.session.add(title_msg)
+        
+        db.session.commit()
         return jsonify({'success': True, 'new_title': new_title})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @ai_bp.route('/generate/itinerary', methods=['POST'])

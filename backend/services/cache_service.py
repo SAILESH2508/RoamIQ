@@ -51,7 +51,9 @@ class CacheService:
                 if cached:
                     return json.loads(cached)
             else:
-                cache_file = os.path.join(self.cache_dir, f"{key}.cache")
+                # Sanitize key for use as a filename (colons are invalid on Windows)
+                safe_key = key.replace(':', '_').replace('/', '_')
+                cache_file = os.path.join(self.cache_dir, f"{safe_key}.cache")
                 if os.path.exists(cache_file):
                     with open(cache_file, 'rb') as f:
                         cached_data = pickle.load(f)
@@ -74,7 +76,9 @@ class CacheService:
                     json.dumps(value, default=str)
                 )
             else:
-                cache_file = os.path.join(self.cache_dir, f"{key}.cache")
+                # Sanitize key for use as a filename (colons are invalid on Windows)
+                safe_key = key.replace(':', '_').replace('/', '_')
+                cache_file = os.path.join(self.cache_dir, f"{safe_key}.cache")
                 cached_data = {
                     'data': value,
                     'expires': datetime.now() + timedelta(seconds=ttl_seconds)

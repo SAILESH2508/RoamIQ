@@ -1,35 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import api from '../../api/axios';
 import { FaMapMarkerAlt, FaSync } from 'react-icons/fa';
 import { Button } from 'react-bootstrap';
 
 const LocationTracker = ({ onUpdate, hideText = false }) => {
-    const [location, setLocation] = useState(null);
+    const [location, setLocation] = useState(() => {
+        const cached = localStorage.getItem('roamiq-user-location');
+        return cached ? JSON.parse(cached) : { lat: 11.0168, lng: 76.9558, address: 'Coimbatore, Tamil Nadu, India' };
+    });
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState(null);
 
     const updateLocation = useCallback(async (lat, lng) => {
         setIsUpdating(true);
         try {
-            // Reverse geocode to get street name/address
+            // Reverse geocode via the backend proxy (avoids CORS and uses auth token)
             let address = 'Unknown Location';
             try {
-                // Nominatim requires a User-Agent or it might return 403
-                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-                    headers: { 'User-Agent': 'RoamIQ/1.0' }
-                });
-                address = geoRes.data.display_name;
+                const geoRes = await api.get(
+                    `/api/travel/reverse?lat=${lat}&lon=${lng}`
+                );
+                address = geoRes.data.display_name || address;
             } catch (err) {
                 console.warn('Reverse geocoding failed', err);
             }
 
-            await api.post('/api/travel/user/location',
-                { lat, lng, address }
-            );
+            try {
+                await api.post('/api/travel/user/location', { lat, lng, address });
+            } catch (e) {
+                console.warn('Backend user location update failed', e);
+            }
 
             const newLoc = { lat, lng, address };
             setLocation(newLoc);
+            localStorage.setItem('roamiq-user-location', JSON.stringify(newLoc));
             if (onUpdate) onUpdate(newLoc);
             setError(null);
         } catch (err) {
@@ -43,7 +47,9 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
 
     const requestLocation = useCallback(() => {
         if (!navigator.geolocation) {
-            setError("Geolocation not supported");
+            console.warn("Geolocation not supported. Using Coimbatore default.");
+            setError("GPS Unavail.");
+            updateLocation(11.0168, 76.9558);
             return;
         }
 
@@ -55,27 +61,29 @@ const LocationTracker = ({ onUpdate, hideText = false }) => {
             },
             (err) => {
                 let msg = "Location lookup failed";
-                if (err.code === 1) msg = "Location access denied";
+                if (err.code === 1) msg = "GPS Denied";
                 if (err.code === 2) msg = "Signal lost";
                 if (err.code === 3) msg = "Request timed out";
 
-                console.warn("Location error:", msg);
+                console.warn("Location error:", msg, "- falling back to Coimbatore.");
                 setError(msg);
                 setIsUpdating(false);
+                
+                // Fail-safe: Always fall back to Coimbatore default so the whole application remains functional
+                updateLocation(11.0168, 76.9558);
             },
             { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
         );
     }, [updateLocation]);
 
     useEffect(() => {
-        requestLocation();
-        const intervalId = setInterval(requestLocation, 600000); // 10 mins
-        return () => clearInterval(intervalId);
-    }, [requestLocation]);
+        // Do NOT automatically call requestLocation() on mount!
+        // This avoids annoying location tracking prompts on reload and page changes.
+    }, []);
 
     return (
         <div className="location-tracker-status d-flex align-items-center w-100">
-            <div className="d-flex align-items-center w-100 justify-content-between bg-primary bg-opacity-10 px-3 py-2 rounded-4 border border-primary border-opacity-25 shadow-sm">
+            <div className="d-flex align-items-center w-100 justify-content-between bg-transparent px-3 py-2">
                 <div className="d-flex align-items-center gap-2">
                     <FaMapMarkerAlt className={`text-primary`} size={14} />
                     {isUpdating ? (

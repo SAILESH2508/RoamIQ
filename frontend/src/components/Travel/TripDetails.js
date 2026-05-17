@@ -11,10 +11,12 @@ import TicketManager from './TicketManager';
 import ExpenseTracker from './ExpenseTracker';
 import WeatherWidget from './WeatherWidget';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { useData } from '../../contexts/DataContext';
 
 const TripDetails = () => {
     const { id } = useParams();
     const { formatCurrency, convertFromUSD, convertToUSD } = useCurrency();
+    const { refreshData } = useData();
     const [trip, setTrip] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('itinerary');
@@ -62,9 +64,10 @@ const TripDetails = () => {
         if (!window.confirm("Are you sure you want to delete this trip?")) return;
         try {
             await axios.delete(`/api/travel/trips/${id}`);
+            refreshData();
             toast.success("Trip deleted");
             window.location.href = '/dashboard';
-        } catch (error) {
+        } catch {
             toast.error("Failed to delete trip");
         }
     };
@@ -100,6 +103,7 @@ const TripDetails = () => {
             };
             const response = await axios.put(`/api/travel/trips/${id}`, normalizedData);
             setTrip(response.data.trip);
+            refreshData();
             setShowEditModal(false);
             toast.success("Trip updated successfully!");
         } catch (error) {
@@ -119,6 +123,7 @@ const TripDetails = () => {
                 currency: 'USD' // Standardized base
             });
             setTrip(response.data.trip);
+            refreshData();
             setShowAIModal(false);
             setAiPrompt('');
             toast.success("Trip updated by AI! 🪄");
@@ -155,8 +160,8 @@ const TripDetails = () => {
                 </Modal.Header>
                 <Modal.Body className="p-4">
                     <p className="text-muted small mb-4">
-                        Tell the AI how you'd like to change your trip. For example: 
-                        "Make it more luxury", "Add 2 more days of adventure in the mountains", or "Focus more on local food experiences".
+                        Tell the AI how you&apos;d like to change your trip. For example: 
+                        &quot;Make it more luxury&quot;, &quot;Add 2 more days of adventure in the mountains&quot;, or &quot;Focus more on local food experiences&quot;.
                     </p>
                     <Form onSubmit={handleAISubmit}>
                         <Form.Group className="mb-4">
@@ -380,7 +385,7 @@ const TripDetails = () => {
                                             </div>
                                             <div className="bg-white bg-opacity-50 p-3 rounded-3 mb-4 border border-light">
                                                 <p className="text-muted small mb-0 fst-italic">
-                                                    "{trip.notes || "No notes added yet. Add some reminders for your trip!"}"
+                                                    &quot;{trip.notes || "No notes added yet. Add some reminders for your trip!"}&quot;
                                                 </p>
                                             </div>
 

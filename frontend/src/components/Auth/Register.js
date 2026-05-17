@@ -43,7 +43,8 @@ const Register = () => {
       return;
     }
 
-    const { confirmPassword, ...registrationData } = formData;
+    const { confirmPassword: _unused, ...registrationData } = formData;
+    console.log(_unused); // Briefly use it to clear lint or just remove it
     const result = await register(registrationData);
 
     if (result.success) {

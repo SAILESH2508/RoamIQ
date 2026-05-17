@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.extensions import db
 
 class MoodLog(db.Model):
@@ -11,7 +11,7 @@ class MoodLog(db.Model):
     polarity = db.Column(db.Float, nullable=False)
     subjectivity = db.Column(db.Float, nullable=False)
     note = db.Column(db.Text, nullable=True) # Optional note or context (e.g., user message)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     
     def to_dict(self):
         return {

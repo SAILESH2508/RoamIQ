@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Row, Col } from 'react-bootstrap';
+import { Container, Row, Col, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { FaCompass, FaMagic, FaArrowRight, FaCloudSun, FaWallet, FaMapMarkedAlt, FaTicketAlt, FaGlobe } from 'react-icons/fa';
 import { motion } from 'framer-motion';
@@ -43,7 +43,7 @@ const Home = () => {
                         <div className="d-flex justify-content-center gap-3 flex-wrap">
                             {user ? (
                                 <>
-                                    <Link to="/dashboard" className="btn-premium">
+                                    <Link to="/dashboard" className="btn btn-primary px-5 py-3 rounded-pill fw-black shadow-lg border-0" style={{ background: 'var(--primary-gradient)', fontSize: '1.1rem' }}>
                                         GO TO DASHBOARD <FaArrowRight />
                                     </Link>
                                     <Link to="/ai" className="btn-premium-outline">
@@ -66,12 +66,12 @@ const Home = () => {
             </section>
 
             {/* Feature Showcase */}
-            <section className="py-5" style={{ background: 'white' }}>
+            <section className="py-5" style={{ background: 'transparent' }}>
                 <Container className="py-5">
                     <div className="text-center mb-5">
                         <h2 className="display-4 fw-bold mb-3">One Studio. <span className="text-primary">Infinite</span> Adventures.</h2>
                         <p className="text-muted fs-5 mx-auto" style={{ maxWidth: '700px' }}>
-                            We've consolidated everything you need for modern travel into a single, cohesive intelligence platform.
+                            We&apos;ve consolidated everything you need for modern travel into a single, cohesive intelligence platform.
                         </p>
                     </div>
 
@@ -108,7 +108,7 @@ const Home = () => {
                         <Col lg={6}>
                             <h2 className="display-5 fw-bold mb-4">Travel with <span className="text-primary">Confidence.</span></h2>
                             <p className="fs-5 text-muted mb-4">
-                                RoamIQ isn't just a planner; it's your 24/7 digital concierge that anticipates your needs 
+                                RoamIQ isn&apos;t just a planner; it&apos;s your 24/7 digital concierge that anticipates your needs 
                                 and keeps you safe, informed, and on budget.
                             </p>
                             <div className="d-flex flex-column gap-3">
@@ -160,12 +160,5 @@ const Home = () => {
         </div>
     );
 };
-
-// Simple Badge component since it wasn't imported from react-bootstrap correctly
-const Badge = ({ children, className, style }) => (
-    <span className={`badge ${className}`} style={{ fontSize: '0.8rem', letterSpacing: '1px', ...style }}>
-        {children}
-    </span>
-);
 
 export default Home;
