@@ -3,7 +3,7 @@ import { Button, Form, Modal, Spinner, Badge, Dropdown, Col } from 'react-bootst
 import {
     FaRobot, FaPaperPlane, FaMicrophone, FaPlus, FaTrash,
     FaImage, FaSuitcase, FaTimes, FaMapMarkedAlt, FaSync, FaCalendar, FaFilePdf,
-    FaChartBar, FaEdit, FaEllipsisV, FaCheck
+    FaChartBar, FaEdit, FaEllipsisV, FaCheck, FaFolderPlus
 } from 'react-icons/fa';
 import LocationTracker from '../Travel/LocationTracker';
 import axios from '../../api/axios';
@@ -13,6 +13,37 @@ import { v4 as uuidv4 } from 'uuid';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
+
+const parseItinerary = (content) => {
+    if (!content) return null;
+    
+    // Try to extract JSON from code block
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/({[\s\S]*"days"[\s\S]*})/);
+    if (jsonMatch) {
+        try {
+            const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+            if (parsed && (parsed.days || parsed.trip_title)) {
+                return parsed;
+            }
+        } catch (e) {
+            // Ignore
+        }
+    }
+    
+    // Check if raw text is JSON
+    const cleanContent = content.trim();
+    if (cleanContent.startsWith('{') && cleanContent.endsWith('}')) {
+        try {
+            const parsed = JSON.parse(cleanContent);
+            if (parsed && (parsed.days || parsed.trip_title)) {
+                return parsed;
+            }
+        } catch (e) {
+            // Ignore
+        }
+    }
+    return null;
+};
 
 const GenAIHub = () => {
     const { currentCurrency, formatCurrency } = useCurrency();
@@ -265,7 +296,9 @@ const GenAIHub = () => {
                     formData.append('audio', audioBlob, 'voice.webm');
                     formData.append('conversation_id', conversationId);
                     try {
-                        const res = await axios.post('/api/ai/audio/transcribe', formData);
+                        const res = await axios.post('/api/ai/audio/transcribe', formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        });
                         if (res.data.text) {
                             addMessage(res.data.text, 'user');
                             addMessage(res.data.ai_response, 'ai');
@@ -312,8 +345,36 @@ const GenAIHub = () => {
         }
     };
 
+    const getActiveDestination = () => {
+        // Look for any generated itineraries in the messages
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const itinerary = parseItinerary(messages[i].content);
+            if (itinerary && itinerary.destination) {
+                return itinerary.destination;
+            }
+        }
+        // Fallback to next saved trip
+        if (upcomingTrip) {
+            return upcomingTrip.destination;
+        }
+        return "Goa, India"; // Fallback to a gorgeous default dream spot!
+    };
+
+    const getActiveTripTitle = () => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const itinerary = parseItinerary(messages[i].content);
+            if (itinerary && itinerary.trip_title) {
+                return itinerary.trip_title;
+            }
+        }
+        if (upcomingTrip) {
+            return upcomingTrip.title;
+        }
+        return "Goan Getaway: Sun, Sand & Spice!";
+    };
+
     return (
-        <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: 'var(--bg-gradient-main)', fontFamily: "'Outfit', sans-serif" }}>
+        <div className="chat-interface" style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: isDarkMode ? 'var(--bg-main)' : '#ffffff', fontFamily: "'Outfit', sans-serif" }}>
             {/* Sidebar: AI Studio Controls */}
             <aside className="dashboard-sidebar d-flex flex-column" style={{ 
                 width: '240px', 
@@ -368,15 +429,38 @@ const GenAIHub = () => {
                             <FaSuitcase className="text-primary me-2" /> Packing List
                         </Button>
                         <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={async () => {
-                            if (!upcomingTrip) return toast.info("Plan a trip first!");
+                            setIsLoading(true);
                             try {
-                                const res = await axios.post('/api/ai/generate/postcard', { trip_id: upcomingTrip.id });
-                                addMessage("Here's a digital postcard for your trip!", 'ai', { type: 'postcard', data: res.data });
-                            } catch (e) { toast.error("Failed to generate postcard."); }
+                                const dest = getActiveDestination();
+                                const title = getActiveTripTitle();
+                                const res = await axios.post('/api/ai/generate/postcard', { 
+                                    trip_id: upcomingTrip ? upcomingTrip.id : null,
+                                    destination: dest,
+                                    title: title
+                                });
+                                addMessage(`AI Postcard for ${dest}`, 'postcard', { data: res.data });
+                            } catch (e) { 
+                                toast.error("Failed to generate postcard."); 
+                            } finally {
+                                setIsLoading(false);
+                            }
                         }} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                             <FaImage className="text-primary me-2" /> AI Postcard
                         </Button>
-                        <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={() => toast.info('Insights coming soon')} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                        <Button variant="light" className="text-start small fw-bold py-2 rounded-3 hover-bg-light shadow-sm" onClick={async () => {
+                            setIsLoading(true);
+                            try {
+                                const dest = getActiveDestination();
+                                const res = await axios.post('/api/ai/generate/insights', { 
+                                    destination: dest
+                                });
+                                addMessage(`AI Insights for ${dest}`, 'insights', { data: { ...res.data, destination: dest } });
+                            } catch (e) { 
+                                toast.error("Failed to gather travel insights."); 
+                            } finally {
+                                setIsLoading(false);
+                            }
+                        }} style={{ fontSize: '0.8rem', background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                             <FaChartBar className="text-primary me-2" /> Travel Insights
                         </Button>
                     </div>
@@ -441,12 +525,6 @@ const GenAIHub = () => {
                         </div>
                     </div>
                     <div className="d-flex gap-2">
-                        <Button 
-                            className="btn-premium py-1 px-3 x-small fw-black shadow-sm" 
-                            onClick={() => setShowSaveModal(true)}
-                        >
-                            SAVE AS ADVENTURE
-                        </Button>
                         <Button variant="light" size="sm" className="rounded-pill border-0" onClick={() => loadConversation(conversationId)}>
                             <FaSync className="text-muted" size={12} />
                         </Button>
@@ -457,12 +535,12 @@ const GenAIHub = () => {
                     style={{ 
                         backgroundImage: isDarkMode 
                             ? `linear-gradient(rgba(10, 15, 36, 0.95), rgba(10, 15, 36, 0.95)), url(/assets/ai-assistant.png)`
-                            : `linear-gradient(rgba(255, 248, 240, 0.95), rgba(255, 248, 240, 0.95)), url(/assets/ai-assistant.png)`,
+                            : `linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), url(/assets/ai-assistant.png)`,
                         backgroundSize: '300px',
                         backgroundPosition: 'center',
                         backgroundRepeat: 'no-repeat',
                         backgroundAttachment: 'local',
-                        backgroundColor: 'var(--bg-main)'
+                        backgroundColor: isDarkMode ? 'var(--bg-main)' : '#ffffff'
                     }}
                 >
                     {messages.length <= 1 && (
@@ -494,16 +572,38 @@ const GenAIHub = () => {
                     )}
                     {messages.map(msg => (
                             <div key={msg.id} className={`d-flex ${msg.type === 'user' ? 'justify-content-end' : 'justify-content-start'} mb-4 animate-fade-in`} style={{ position: 'relative', zIndex: 1 }}>
-                                <div className={`message-bubble ${msg.type === 'user' ? 'user-message shadow-sm' : 'ai-message border glass-panel'}`} style={{ 
+                                <div className={`message-bubble ${
+                                    msg.type === 'user' 
+                                        ? 'user-message shadow-sm' 
+                                        : msg.type === 'postcard' 
+                                            ? 'postcard-bubble shadow-md' 
+                                            : msg.type === 'insights'
+                                                ? 'insights-bubble shadow-md border'
+                                                : 'ai-message border glass-panel'
+                                }`} style={{ 
                                     maxWidth: '85%', 
                                     borderRadius: '20px', 
                                     backdropFilter: 'blur(10px)', 
                                     WebkitBackdropFilter: 'blur(10px)',
-                                    fontWeight: '700',
-                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.65)',
-                                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'var(--glass-border-weather)',
-                                    color: 'var(--text-main)',
-                                    padding: '16px 20px'
+                                    fontWeight: '800',
+                                    fontSize: '1.25rem',
+                                    background: msg.type === 'user'
+                                        ? 'var(--primary-gradient)'
+                                        : msg.type === 'postcard' 
+                                            ? '#ffffff' 
+                                            : msg.type === 'insights'
+                                                ? (isDarkMode ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.85)')
+                                                : (isDarkMode ? 'rgba(30, 41, 59, 0.45)' : 'rgba(255, 255, 255, 0.65)'),
+                                    borderColor: msg.type === 'user'
+                                        ? 'transparent'
+                                        : msg.type === 'postcard' 
+                                            ? '#ff7a00' 
+                                            : msg.type === 'insights'
+                                                ? 'rgba(255, 107, 0, 0.2)'
+                                                : (isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'var(--glass-border-weather)'),
+                                    color: msg.type === 'user' ? '#ffffff' : msg.type === 'postcard' ? '#e66e00' : 'var(--text-main)',
+                                    padding: msg.type === 'postcard' ? '20px 24px' : '18px 24px',
+                                    border: msg.type === 'postcard' ? '2px dashed #ff7a00' : undefined
                                 }}>
                                     {msg.image && <img src={msg.image} alt="Upload" className="img-fluid rounded-3 mb-2 shadow-sm" style={{ maxHeight: '300px' }} />}
                                     {msg.isPdf && (
@@ -515,55 +615,332 @@ const GenAIHub = () => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="markdown-content" style={{ fontWeight: '700' }}>
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                    </div>
+                                    {(() => {
+                                        if (msg.type === 'postcard') {
+                                            const postcardData = msg.data || {};
+                                            return (
+                                                <div style={{ position: 'relative', minWidth: '280px', maxWidth: '500px' }}>
+                                                    <div className="d-none d-sm-block position-absolute" style={{
+                                                        top: '-5px',
+                                                        right: '-5px',
+                                                        width: '60px',
+                                                        height: '75px',
+                                                        border: '2px solid #ff7a00',
+                                                        padding: '2px',
+                                                        background: '#fffbf5',
+                                                        textAlign: 'center',
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 'bold',
+                                                        color: '#ff7a00',
+                                                        borderRadius: '4px',
+                                                        transform: 'rotate(5deg)',
+                                                        zIndex: 2
+                                                    }}>
+                                                        <div style={{ fontSize: '1.6rem' }}>🌴</div>
+                                                        ROAMIQ
+                                                    </div>
+                                                    
+                                                    <div className="postcard-header mb-3 pb-2 border-bottom" style={{ borderColor: 'rgba(255, 122, 0, 0.2)' }}>
+                                                        <h5 className="m-0 fw-black text-uppercase" style={{ color: '#ff6b00', fontSize: '1.15rem' }}>
+                                                            📬 Postcard from {postcardData.destination || 'Adventure'}
+                                                        </h5>
+                                                    </div>
+                                                    
+                                                    <div className="postcard-body mb-4 pr-md-5">
+                                                        <p className="postcard-content m-0" style={{ 
+                                                            fontFamily: "'Outfit', sans-serif", 
+                                                            color: '#e66e00',
+                                                            lineHeight: '1.5',
+                                                            fontStyle: 'italic',
+                                                            fontWeight: '800',
+                                                            fontSize: '1.3rem'
+                                                        }}>
+                                                            "{postcardData.postcard_text}"
+                                                        </p>
+                                                    </div>
+                                                    
+                                                    <div className="postcard-footer text-end mt-2">
+                                                        <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary px-3 py-1 fw-black text-uppercase" style={{ fontSize: '0.7rem', border: '1px solid rgba(255, 107, 0, 0.2)' }}>
+                                                            ✍️ {postcardData.signature || 'Your travel assistant'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (msg.type === 'insights') {
+                                            const insightsData = msg.data || {};
+                                            return (
+                                                <div style={{ minWidth: '280px', maxWidth: '500px' }}>
+                                                    <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style={{ borderColor: 'rgba(255, 107, 0, 0.15)' }}>
+                                                        <span className="badge rounded-pill bg-primary-gradient px-3 py-1 text-uppercase fw-black text-white" style={{ fontSize: '0.7rem' }}>
+                                                            🧠 DESTINATION INTELLIGENCE
+                                                        </span>
+                                                        <span className="fw-black text-primary" style={{ fontSize: '0.9rem' }}>{insightsData.destination || 'Local Insights'}</span>
+                                                    </div>
+                                                    
+                                                    {insightsData.weather_vibe && (
+                                                        <div className="mb-3 p-3 rounded-3" style={{ background: isDarkMode ? 'rgba(255, 107, 0, 0.08)' : 'rgba(255, 107, 0, 0.05)', border: '1px solid rgba(255, 107, 0, 0.1)' }}>
+                                                            <div className="fw-black text-uppercase small text-primary mb-1" style={{ fontSize: '0.75rem' }}>🌤️ Seasonal Weather Vibe</div>
+                                                            <div className="small fw-bold" style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{insightsData.weather_vibe}</div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {insightsData.hidden_gems && insightsData.hidden_gems.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <div className="fw-black text-uppercase small text-muted mb-2" style={{ fontSize: '0.75rem' }}>💎 Hidden Gems to Discover</div>
+                                                            <div className="d-flex flex-wrap gap-2">
+                                                                {insightsData.hidden_gems.map((gem, idx) => (
+                                                                    <span key={idx} className="badge bg-secondary bg-opacity-10 text-dark px-3 py-1 rounded-pill small fw-black text-uppercase" style={{ fontSize: '0.7rem', border: '1px solid rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>
+                                                                        ✨ {gem}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {insightsData.customs && (
+                                                        <div className="mb-3">
+                                                            <div className="fw-black text-uppercase small text-muted mb-1" style={{ fontSize: '0.75rem' }}>📜 Respectful Etiquette</div>
+                                                            <div className="small fw-bold" style={{ color: 'var(--text-main)', lineHeight: '1.4', fontSize: '0.85rem' }}>{insightsData.customs}</div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {insightsData.green_tip && (
+                                                        <div className="mb-3 p-3 rounded-3" style={{ background: 'rgba(40, 167, 69, 0.05)', border: '1px solid rgba(40, 167, 69, 0.1)' }}>
+                                                            <div className="fw-black text-uppercase small text-success mb-1" style={{ fontSize: '0.75rem' }}>🍃 Carbon Footprint Advice</div>
+                                                            <div className="small fw-bold" style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{insightsData.green_tip}</div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {insightsData.scam_alerts && insightsData.scam_alerts.length > 0 && (
+                                                        <div className="p-3 rounded-3" style={{ background: 'rgba(220, 53, 69, 0.05)', border: '1px solid rgba(220, 53, 69, 0.1)' }}>
+                                                            <div className="fw-black text-uppercase small text-danger mb-2" style={{ fontSize: '0.75rem' }}>⚠️ Safety Alerts & Scams</div>
+                                                            <div className="d-flex flex-column gap-1">
+                                                                {insightsData.scam_alerts.map((alert, idx) => (
+                                                                    <div key={idx} className="small fw-bold d-flex gap-2 align-items-start" style={{ color: 'var(--text-main)', fontSize: '0.8rem' }}>
+                                                                        <span className="text-danger">•</span>
+                                                                        <span>{alert}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        const itinerary = msg.type === 'ai' ? parseItinerary(msg.content) : null;
+                                        if (itinerary) {
+                                            // Get any text preceding or succeeding the JSON block
+                                            const cleanContent = msg.content;
+                                            const jsonRegex = /```json\s*([\s\S]*?)\s*```|({[\s\S]*"days"[\s\S]*})/;
+                                            const textParts = cleanContent.split(jsonRegex);
+                                            // Render any text explanation before/after the itinerary
+                                            const introText = textParts[0]?.trim();
+                                            const outroText = textParts[textParts.length - 1]?.trim();
+                                            
+                                            return (
+                                                <div className="itinerary-wrapper w-100" style={{ minWidth: '320px' }}>
+                                                    {introText && introText.length > 5 && !introText.startsWith('{') && (
+                                                        <div className="markdown-content mb-3" style={{ fontWeight: '700' }}>
+                                                            <ReactMarkdown>{introText}</ReactMarkdown>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div className="itinerary-display-container mt-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                        {/* Beautiful Header Card */}
+                                                        <div className="p-4 rounded-4 shadow-sm mb-3 text-white" style={{
+                                                            background: 'var(--primary-gradient)',
+                                                            boxShadow: '0 8px 32px rgba(255, 107, 0, 0.15)',
+                                                            borderRadius: '1.25rem'
+                                                        }}>
+                                                            <div className="d-flex justify-content-between align-items-start">
+                                                                <div>
+                                                                    <span className="badge rounded-pill mb-2 px-3 py-1 text-uppercase fw-black" style={{ 
+                                                                        fontSize: '0.65rem', 
+                                                                        letterSpacing: '0.5px',
+                                                                        background: 'rgba(255, 255, 255, 0.25)', 
+                                                                        color: '#ffffff',
+                                                                        backdropFilter: 'blur(4px)'
+                                                                    }}>
+                                                                        🌴 AI Expedition Plan
+                                                                    </span>
+                                                                    <h3 className="m-0 fw-black" style={{ fontSize: '1.4rem', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                                                        {itinerary.trip_title || itinerary.destination || 'Custom Adventure'}
+                                                                    </h3>
+                                                                    <p className="small m-0 mt-1 opacity-75 fw-bold">Destination: {itinerary.destination || 'Unspecified'}</p>
+                                                                </div>
+                                                                <div className="text-end">
+                                                                    <div className="x-small fw-bold opacity-75 text-uppercase" style={{ fontSize: '0.6rem' }}>Est. Budget</div>
+                                                                    <h4 className="fw-black m-0" style={{ fontSize: '1.5rem', color: '#fff' }}>
+                                                                        {formatCurrency(itinerary.estimated_total_cost || itinerary.budget || 0, currentCurrency, currentCurrency)}
+                                                                    </h4>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Days Timeline */}
+                                                        <div className="d-flex flex-column gap-3 mb-3">
+                                                            {(itinerary.days || itinerary.itinerary || []).map((dayData, idx) => (
+                                                                <div key={idx} className="p-3 rounded-4 shadow-sm border" style={{
+                                                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.35)' : 'rgba(255, 255, 255, 0.75)',
+                                                                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                                                                    borderRadius: '1rem'
+                                                                }}>
+                                                                    <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style={{ borderColor: 'rgba(0, 0, 0, 0.05)' }}>
+                                                                        <div className="d-flex align-items-center gap-2">
+                                                                            <span className="badge bg-primary rounded-pill bg-primary-gradient border-0 px-2 py-1 small fw-black" style={{ fontSize: '0.7rem' }}>
+                                                                                Day {dayData.day}
+                                                                            </span>
+                                                                            {dayData.date && (
+                                                                                <span className="small text-muted fw-bold" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                                    📅 {new Date(dayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {dayData.estimated_cost && (
+                                                                            <div className="small fw-black text-primary" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
+                                                                                Daily Est: {formatCurrency(
+                                                                                    Object.values(dayData.estimated_cost).reduce((a, b) => a + b, 0),
+                                                                                    currentCurrency,
+                                                                                    currentCurrency
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Activities List */}
+                                                                    <div className="d-flex flex-column gap-2 mb-3">
+                                                                        {(dayData.activities || []).map((act, actIdx) => (
+                                                                            <div key={actIdx} className="d-flex gap-3 align-items-start px-1">
+                                                                                <span className="mt-1" style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>🔸</span>
+                                                                                <span className="small fw-bold" style={{ color: 'var(--text-main)', lineHeight: '1.4' }}>{act}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+
+                                                                    {/* Cost Category Breakdown Badges */}
+                                                                    {dayData.estimated_cost && (
+                                                                        <div className="d-flex flex-wrap gap-2 pt-2 border-top" style={{ borderColor: 'rgba(0, 0, 0, 0.02)' }}>
+                                                                            {Object.entries(dayData.estimated_cost).map(([cat, val]) => {
+                                                                                if (val === 0) return null;
+                                                                                let icon = '💸';
+                                                                                if (cat.toLowerCase().includes('transport')) icon = '🚗';
+                                                                                if (cat.toLowerCase().includes('accommodation') || cat.toLowerCase().includes('hotel') || cat.toLowerCase().includes('lodging')) icon = '🏨';
+                                                                                if (cat.toLowerCase().includes('food') || cat.toLowerCase().includes('meal')) icon = '🍔';
+                                                                                if (cat.toLowerCase().includes('activities') || cat.toLowerCase().includes('ticket')) icon = '🎟️';
+                                                                                
+                                                                                return (
+                                                                                    <span key={cat} className="badge bg-secondary bg-opacity-10 text-muted px-2 py-1 rounded-pill small fw-bold text-uppercase" style={{ fontSize: '0.65rem', border: '1px solid rgba(0, 0, 0, 0.05)', color: 'var(--text-main)' }}>
+                                                                                        {icon} {cat}: {formatCurrency(val, currentCurrency, currentCurrency)}
+                                                                                    </span>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {outroText && outroText.length > 5 && !outroText.startsWith('{') && (
+                                                        <div className="markdown-content mt-3" style={{ fontWeight: '700' }}>
+                                                            <ReactMarkdown>{outroText}</ReactMarkdown>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Standard markdown fallback
+                                        return (
+                                            <div className="markdown-content" style={{ fontWeight: '700' }}>
+                                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                            </div>
+                                        );
+                                    })()}
                                     {msg.type === 'ai' && !msg.id.toString().includes('welcome') && (
-                                        <div className="mt-3 pt-2 border-top border-light d-flex gap-2">
-                                            <Button variant="light" className="x-small fw-bold py-1 px-2 border hover-bg-light" onClick={() => {
-                                                const content = msg.content;
-                                                
-                                                // Try to extract JSON itinerary
-                                                let extractedItinerary = null;
-                                                const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/({[\s\S]*"days"[\s\S]*})/);
-                                                
-                                                if (jsonMatch) {
-                                                    try {
-                                                        extractedItinerary = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-                                                    } catch (e) {
-                                                        console.error("Failed to parse extracted JSON", e);
+                                        <div className="mt-3 pt-3 border-top border-light d-flex justify-content-center w-100">
+                                            <Button 
+                                                className="btn-premium px-4 py-2 shadow-sm rounded-pill fw-black" 
+                                                style={{ 
+                                                    fontSize: '0.85rem', 
+                                                    background: 'var(--primary-gradient)', 
+                                                    border: 'none', 
+                                                    color: '#ffffff',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    boxShadow: '0 8px 16px rgba(255, 107, 0, 0.2)',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                                onClick={() => {
+                                                    const content = msg.content;
+                                                    
+                                                    // Try to extract JSON itinerary
+                                                    let extractedItinerary = null;
+                                                    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/({[\s\S]*"days"[\s\S]*})/);
+                                                    
+                                                    if (jsonMatch) {
+                                                        try {
+                                                            extractedItinerary = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                                                        } catch (e) {
+                                                            console.error("Failed to parse extracted JSON", e);
+                                                        }
                                                     }
-                                                }
 
-                                                const lines = content.split('\n');
-                                                let dest = extractedItinerary?.destination || extractedItinerary?.trip_title;
-                                                
-                                                if (!dest) {
-                                                    // Fallback: Try to find a clean destination from the first few lines
-                                                    let firstLine = lines[0].replace(/[#*]/g, '').trim();
-                                                    // Remove "Here's a...", "Plan for...", etc.
-                                                    dest = firstLine.replace(/^(Here's a|Plan for|Itinerary for|A condensed|Your trip to|Trip to)\s+/i, '')
-                                                                    .replace(/\s+(itinerary|keeping|budget|for).*$/i, '')
-                                                                    .replace(/,.*$/, '')
-                                                                    .trim();
-                                                }
+                                                    const lines = content.split('\n');
+                                                    let dest = extractedItinerary?.destination || extractedItinerary?.trip_title;
+                                                    
+                                                    if (!dest) {
+                                                        // Fallback: Try to find a clean destination from the first few lines
+                                                        let firstLine = lines[0].replace(/[#*]/g, '').trim();
+                                                        // Remove "Here's a...", "Plan for...", etc.
+                                                        dest = firstLine.replace(/^(Here's a|Plan for|Itinerary for|A condensed|Your trip to|Trip to)\s+/i, '')
+                                                                        .replace(/\s+(itinerary|keeping|budget|for).*$/i, '')
+                                                                        .replace(/,.*$/, '')
+                                                                        .trim();
+                                                    }
 
-                                                if (!dest || dest.length < 2) {
-                                                    dest = 'New Adventure';
-                                                }
+                                                    if (!dest || dest.length < 2) {
+                                                        dest = 'New Adventure';
+                                                    }
 
-                                                setSaveData({ 
-                                                    ...saveData, 
-                                                    destination: dest, 
-                                                    title: extractedItinerary?.trip_title || `${dest} Adventure`,
-                                                    startDate: '',
-                                                    endDate: '',
-                                                    budget: extractedItinerary?.estimated_total_cost || '',
-                                                    itinerary: extractedItinerary // Store it for saving
-                                                });
-                                                setShowSaveModal(true);
-                                            }}>
-                                                SAVE PLAN
+                                                    // Extract start and end dates dynamically
+                                                    let start = extractedItinerary?.start_date || extractedItinerary?.startDate || '';
+                                                    let end = extractedItinerary?.end_date || extractedItinerary?.endDate || '';
+                                                    
+                                                    if (!start && extractedItinerary?.days && extractedItinerary.days.length > 0) {
+                                                        start = extractedItinerary.days[0]?.date || '';
+                                                        end = extractedItinerary.days[extractedItinerary.days.length - 1]?.date || '';
+                                                    }
+                                                    
+                                                    // Default to tomorrow's date if still empty
+                                                    if (!start) {
+                                                        const tomorrow = new Date();
+                                                        tomorrow.setDate(tomorrow.getDate() + 1);
+                                                        start = tomorrow.toISOString().split('T')[0];
+                                                        
+                                                        const duration = parseInt(extractedItinerary?.duration || extractedItinerary?.days?.length || 3, 10);
+                                                        const endDateObj = new Date(tomorrow);
+                                                        endDateObj.setDate(tomorrow.getDate() + duration);
+                                                        end = endDateObj.toISOString().split('T')[0];
+                                                    }
+
+                                                    setSaveData({ 
+                                                        ...saveData, 
+                                                        destination: dest, 
+                                                        title: extractedItinerary?.trip_title || `${dest} Adventure`,
+                                                        startDate: start,
+                                                        endDate: end,
+                                                        budget: extractedItinerary?.estimated_total_cost || '',
+                                                        itinerary: extractedItinerary // Store it for saving
+                                                    });
+                                                    setShowSaveModal(true);
+                                                }}
+                                            >
+                                                <FaFolderPlus size={14} /> SAVE PLAN
                                             </Button>
                                         </div>
                                     )}
@@ -643,8 +1020,8 @@ const GenAIHub = () => {
                                 onChange={(e) => setInputMessage(e.target.value)} 
                                 disabled={isLoading} 
                                 style={{ 
-                                    fontSize: '0.95rem', 
-                                    fontWeight: '700',
+                                    fontSize: '1.25rem', 
+                                    fontWeight: '800',
                                     color: 'var(--text-main)'
                                 }}
                             />

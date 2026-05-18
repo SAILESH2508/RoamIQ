@@ -349,18 +349,42 @@ async def generate_postcard():
     """Generate an AI souvenir postcard."""
     try:
         data = request.get_json()
-        validate_required_fields(data, ['trip_id'])
         
         user_identity = get_jwt_identity()
         user_id = int(user_identity) if user_identity and str(user_identity).isdigit() else None
         
+        trip_id = data.get('trip_id')
+        destination = data.get('destination')
+        title = data.get('title')
+        
         result = await ai_service.generate_travel_postcard(
-            trip_id=int(data['trip_id']),
-            user_id=user_id
+            trip_id=int(trip_id) if trip_id else None,
+            user_id=user_id,
+            destination=destination,
+            title=title
         )
         return jsonify(result)
     except Exception as e:
         logger.error(f"Postcard route error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@ai_bp.route('/generate/insights', methods=['POST'])
+@jwt_required()
+@api_error_handler
+async def generate_insights():
+    """Generate custom travel intelligence and insights."""
+    try:
+        data = request.get_json()
+        destination = data.get('destination', 'Goa, India')
+        current_month = data.get('month', datetime.now().month)
+        
+        result = await ai_service.get_destination_insights(
+            destination=destination,
+            current_month=current_month
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Insights route error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @ai_bp.route('/status', methods=['GET'])

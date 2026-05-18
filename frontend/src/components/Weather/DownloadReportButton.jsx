@@ -173,19 +173,28 @@ const DownloadReportButton = ({ weatherData, predictionData, hourlyData, locatio
     return (
         <button
             onClick={generatePDF}
-            className="btn btn-lg w-100 fw-bold text-uppercase tracking-wider hover-lift shadow border-0 py-3 mt-3"
+            className="btn w-100 fw-black text-uppercase border-0 py-3 mt-3 d-flex align-items-center justify-content-center gap-2"
             disabled={!weatherData}
             style={{ 
-                background: 'linear-gradient(45deg, #f43f5e, #e11d48, #be123c)', 
+                background: 'linear-gradient(135deg, #34d399 0%, #059669 100%)', 
                 color: 'white', 
-                borderRadius: '16px',
-                fontSize: '0.85rem',
-                transition: 'all 0.3s ease',
-                letterSpacing: '0.5px'
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                letterSpacing: '0.7px',
+                boxShadow: '0 4px 18px rgba(5, 150, 105, 0.3)'
+            }}
+            onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'scale(1.02) translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(5, 150, 105, 0.48)';
+            }}
+            onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'scale(1.0)';
+                e.currentTarget.style.boxShadow = '0 4px 18px rgba(5, 150, 105, 0.3)';
             }}
         >
-            <span className="me-2">📊</span>
-            Download Full Intelligence Report
+            <span className="fs-6">📥</span>
+            <span>Download Full Intelligence Report</span>
         </button>
     );
 };

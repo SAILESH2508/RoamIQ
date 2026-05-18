@@ -13,6 +13,125 @@ import { useTheme } from '../../contexts/ThemeContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Title, Tooltip, Legend);
 
+const getConditionStyle = (cond, isDarkMode) => {
+    const c = (cond || '').toLowerCase();
+    if (c.includes('rain') || c.includes('storm') || c.includes('drizzle')) {
+        return { 
+            background: '#2563eb',
+            color: 'white', 
+            border: 'none',
+            borderRadius: '6px'
+        };
+    }
+    if (c.includes('clear') || c.includes('sunny') || c.includes('warm') || c.includes('hot')) {
+        return { 
+            background: '#d97706',
+            color: 'white', 
+            border: 'none',
+            borderRadius: '6px'
+        };
+    }
+    if (c.includes('cloud') || c.includes('overcast') || c.includes('mist') || c.includes('fog')) {
+        return { 
+            background: '#4b5563',
+            color: 'white', 
+            border: 'none',
+            borderRadius: '6px'
+        };
+    }
+    return { 
+        background: '#7c3aed',
+        color: 'white', 
+        border: 'none',
+        borderRadius: '6px'
+    };
+};
+
+const getHourlyCardTheme = (weather, isDarkMode) => {
+    if (!weather) return {
+        background: 'var(--glass-bg-weather)',
+        border: '1px solid var(--glass-border-weather)',
+        boxShadow: '0 15px 45px rgba(0, 0, 0, 0.05)',
+        textColor: 'var(--text-main-weather)'
+    };
+
+    const isDay = weather.is_day === 1;
+    const cond = (weather.condition || '').toLowerCase();
+    const isRain = cond.includes('rain') || cond.includes('drizzle') || cond.includes('storm') || cond.includes('shower');
+    const isCloudy = cond.includes('cloud') || cond.includes('overcast') || cond.includes('mist') || cond.includes('fog');
+    
+    // 1. RAIN
+    if (isRain) {
+        if (isDay) {
+            return {
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.07) 0%, rgba(29, 78, 216, 0.12) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(59, 130, 246, 0.28)',
+                boxShadow: '0 15px 45px rgba(37, 99, 235, 0.06), 0 0 25px rgba(37, 99, 235, 0.04)',
+                textColor: '#1e3a8a'
+            };
+        } else {
+            return {
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(30, 41, 59, 0.85) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(59, 130, 246, 0.22)',
+                boxShadow: '0 15px 45px rgba(0, 0, 0, 0.35), 0 0 30px rgba(59, 130, 246, 0.12)',
+                textColor: '#93c5fd'
+            };
+        }
+    }
+    
+    // 2. SUNNY / CLEAR
+    if (cond.includes('clear') || cond.includes('sunny')) {
+        if (isDay) {
+            return {
+                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.05) 0%, rgba(244, 63, 94, 0.03) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(251, 191, 36, 0.22)',
+                boxShadow: '0 15px 45px rgba(251, 191, 36, 0.04), 0 0 25px rgba(251, 191, 36, 0.02)',
+                textColor: '#78350f'
+            };
+        } else {
+            return {
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(88, 28, 135, 0.12) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(139, 92, 246, 0.18)',
+                boxShadow: '0 15px 45px rgba(0, 0, 0, 0.4), 0 0 30px rgba(139, 92, 246, 0.1)',
+                textColor: '#c084fc'
+            };
+        }
+    }
+    
+    // 3. CLOUDY / OVERCAST / FOG
+    if (isCloudy) {
+        if (isDay) {
+            return {
+                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.05) 0%, rgba(100, 116, 139, 0.05) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(14, 165, 233, 0.18)',
+                boxShadow: '0 15px 45px rgba(14, 165, 233, 0.03)',
+                textColor: '#0f172a'
+            };
+        } else {
+            return {
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.85) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(148, 163, 184, 0.15)',
+                boxShadow: '0 15px 45px rgba(0, 0, 0, 0.35)',
+                textColor: '#cbd5e1'
+            };
+        }
+    }
+
+    // Default Fallback
+    return {
+        background: 'var(--glass-bg-weather)',
+        border: '1px solid var(--glass-border-weather)',
+        boxShadow: '0 15px 45px rgba(0, 0, 0, 0.05)',
+        textColor: 'var(--text-main-weather)'
+    };
+};
+
 const WeatherPage = ({ locationName }) => {
     const routeLocation = useLocation();
     const navigate = useNavigate();
@@ -254,7 +373,7 @@ const WeatherPage = ({ locationName }) => {
             }
         };
         fetchWeather();
-    }, [routeLocation.search, handlePredictManual, locationName]);
+    }, [routeLocation.search, handlePredictManual, locationName, navigate]);
 
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -385,17 +504,18 @@ const WeatherPage = ({ locationName }) => {
                                     </div>
                                 </div>
 
-                                <div className="row">
-                                    <div className="col-md-5">
-                                        <form onSubmit={handlePredict}>
+                                <div className="row g-4 d-flex align-items-stretch">
+                                    <div className="col-md-5 d-flex">
+                                        <div className="w-100 p-4 rounded-4 shadow-sm d-flex flex-column justify-content-between border" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderColor: 'var(--glass-border-weather)' }}>
+                                            <form onSubmit={handlePredict} className="h-100 d-flex flex-column justify-content-between gap-3 w-100">
                                             {[
                                                 { id: 'temperature', label: 'temperature (°C)', color: '#f97316' },
                                                 { id: 'humidity', label: 'humidity (%)', color: '#2563eb' },
-                                                { id: 'rainfall', label: 'rainfall (mm)', color: '#4c1d95' },
-                                                { id: 'wind_speed', label: 'wind speed (km/h)', color: '#16a34a' }
+                                                { id: 'rainfall', label: 'rainfall (mm)', color: '#8b5cf6' },
+                                                { id: 'wind_speed', label: 'wind speed (km/h)', color: '#10b981' }
                                             ].map(field => (
                                                 <div key={field.id} className="mb-3">
-                                                    <label className="text-uppercase fw-black mb-2" style={{ fontSize: '0.85rem', letterSpacing: '0.5px', color: isDarkMode ? '#f8fafc' : '#0f172a', opacity: 0.85 }}>{field.label} •</label>
+                                                    <label className="text-uppercase fw-black mb-2" style={{ fontSize: '0.82rem', letterSpacing: '0.5px', color: isDarkMode ? '#cbd5e1' : '#1e293b', opacity: 0.85 }}>{field.label} •</label>
                                                     <div className="d-flex gap-3 align-items-center">
                                                         <input 
                                                             type="range" 
@@ -407,76 +527,237 @@ const WeatherPage = ({ locationName }) => {
                                                             value={inputs[field.id]} 
                                                             onChange={handleChange} 
                                                             style={{ 
-                                                                '--range-color': field.color,
+                                                                '--track-gradient': field.id === 'temperature' 
+                                                                    ? 'linear-gradient(to right, #fbbf24, #f97316, #ef4444)' 
+                                                                    : field.id === 'humidity' 
+                                                                    ? 'linear-gradient(to right, #cbd5e1, #3b82f6, #1d4ed8)' 
+                                                                    : field.id === 'rainfall' 
+                                                                    ? 'linear-gradient(to right, #e2e8f0, #c084fc, #6366f1)' 
+                                                                    : 'linear-gradient(to right, #e2e8f0, #34d399, #059669)',
+                                                                '--thumb-color': field.color,
                                                                 accentColor: field.color 
                                                             }}
                                                         />
-                                                        <div className="px-3 py-1 rounded-3 fw-bold" style={{ minWidth: '60px', textAlign: 'center', fontSize: '0.75rem', background: `${field.color}10`, color: field.color }}>{inputs[field.id]}</div>
+                                                        <div 
+                                                            className="px-3 py-1.5 rounded-pill fw-black shadow-sm" 
+                                                            style={{ 
+                                                                minWidth: '65px', 
+                                                                textAlign: 'center', 
+                                                                fontSize: '0.8rem', 
+                                                                background: `linear-gradient(135deg, ${field.color}12, ${field.color}22)`, 
+                                                                color: field.color,
+                                                                border: `1px solid ${field.color}35`,
+                                                                boxShadow: `0 2px 8px ${field.color}12`
+                                                            }}
+                                                        >
+                                                            {inputs[field.id]}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <button type="submit" className="btn btn-primary w-100 fw-black py-3 mt-2 rounded-4 text-uppercase shadow-sm" style={{ background: '#22c55e !important', backgroundColor: '#22c55e', border: 'none' }}>
-                                                {loading ? 'Processing...' : 'Run Simulation'}
+                                            <button 
+                                                type="submit" 
+                                                className="btn-premium w-100 fw-black py-3 mt-3 rounded-pill text-uppercase shadow-lg d-flex align-items-center justify-content-center gap-2 border-0" 
+                                                style={{ 
+                                                    background: 'linear-gradient(135deg, #ff7e40 0%, #ff4500 100%)', 
+                                                    color: 'white',
+                                                    fontSize: '0.9rem',
+                                                    letterSpacing: '1px',
+                                                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.02) translateY(-1px)';
+                                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(255, 69, 0, 0.4)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.0)';
+                                                    e.currentTarget.style.boxShadow = 'none';
+                                                }}
+                                            >
+                                                {loading ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                                        <span>Analyzing...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>⚡</span>
+                                                        <span>Run AI Simulation</span>
+                                                    </>
+                                                )}
                                             </button>
                                         </form>
+                                         </div>
                                     </div>
 
-                                     <div className="col-md-7">
-                                        <div className="h-100 p-4 rounded-4 shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-border-weather)' }}>
-                                            <div className="text-center mb-4">
-                                                <h4 className="fw-black mb-0">Condition: <span className="bg-warning text-dark px-3 py-1 rounded-pill">{prediction.condition_tomorrow || 'Cloudy'}</span></h4>
-                                            </div>
-                                            <div className="row text-center mb-4">
-                                                <div className="col-6">
-                                                    <div className="fw-black text-uppercase text-primary mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Predicted Temp</div>
-                                                    <h2 className="fw-black mb-0" style={{ color: isDarkMode ? '#f8fafc' : '#0f172a', fontSize: '1.8rem' }}>{prediction.predicted_temperature}°C</h2>
-                                                </div>
-                                                <div className="col-6">
-                                                    <div className="fw-black text-uppercase text-primary mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Predicted Rain</div>
-                                                    <h2 className="fw-black mb-0" style={{ color: isDarkMode ? '#f8fafc' : '#0f172a', fontSize: '1.8rem' }}>{prediction.predicted_rainfall} mm</h2>
-                                                </div>
-                                            </div>
-                                            <div style={{ height: '80px' }}>
-                                                <Chart type='bar' data={{ labels: ['Temp', 'Rain'], datasets: [{ data: [parseFloat(prediction.predicted_temperature) || 0, parseFloat(prediction.predicted_rainfall) || 0], backgroundColor: ['#f43f5e', '#3b82f6'], borderRadius: 4 }] }} options={{ responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: isDarkMode ? '#f8fafc' : '#0f172a', font: { weight: 'bold' } }, grid: { display: false } } } }} />
-                                            </div>
-                                            <div className="mt-3 p-2 rounded-4 d-flex align-items-center gap-3 shadow-sm" style={{ background: '#3b82f6', color: '#fff', fontSize: '0.9rem', fontWeight: '900' }}>
-                                                <span className="fs-5">📍</span>
-                                                <span>Suggestion: {prediction.suggestion || 'Light rain likely. Keep a raincoat handy.'}</span>
-                                            </div>
-                                            <div className="mt-3">
-                                                <DownloadReportButton weatherData={currentWeather} predictionData={prediction} hourlyData={hourlyData} locationName={currentWeather?.city} />
-                                            </div>
-                                        </div>
-                                    </div>
+                                     <div className="col-md-7 d-flex">
+                                         <div className="h-100 w-100 p-4 rounded-4 shadow-sm d-flex flex-column justify-content-between" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-border-weather)' }}>
+                                             {(() => {
+                                                 const projectionData = {
+                                                     labels: ['Temp (°C)', 'Rain (mm)'],
+                                                     datasets: [
+                                                         {
+                                                             data: [
+                                                                 parseFloat(prediction.predicted_temperature) || 0,
+                                                                 parseFloat(prediction.predicted_rainfall) || 0
+                                                             ],
+                                                             backgroundColor: [
+                                                                 isDarkMode ? '#fbbf24' : '#d97706',
+                                                                 isDarkMode ? '#3b82f6' : '#1d4ed8'
+                                                             ],
+                                                             hoverBackgroundColor: [
+                                                                 isDarkMode ? '#fbbf24' : '#d97706',
+                                                                 isDarkMode ? '#3b82f6' : '#1d4ed8'
+                                                             ],
+                                                             borderRadius: 4,
+                                                             borderSkipped: false,
+                                                             barThickness: 26
+                                                         }
+                                                     ]
+                                                 };
+
+                                                 const projectionOptions = {
+                                                     indexAxis: 'y',
+                                                     responsive: true,
+                                                     maintainAspectRatio: false,
+                                                     plugins: {
+                                                         legend: { display: false },
+                                                         tooltip: {
+                                                             backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                                                             titleColor: isDarkMode ? '#f8fafc' : '#0f172a',
+                                                             bodyColor: isDarkMode ? '#cbd5e1' : '#334155',
+                                                             borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                                                             borderWidth: 1,
+                                                             padding: 10,
+                                                             cornerRadius: 8,
+                                                             callbacks: {
+                                                                 label: (context) => {
+                                                                     const val = context.raw;
+                                                                     return context.dataIndex === 0 ? ` ${val}°C` : ` ${val} mm`;
+                                                                 }
+                                                             }
+                                                         }
+                                                     },
+                                                     scales: {
+                                                         x: {
+                                                             grid: {
+                                                                 color: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                                                 drawBorder: false
+                                                             },
+                                                             ticks: {
+                                                                 display: false
+                                                             }
+                                                         },
+                                                         y: {
+                                                             grid: { display: false },
+                                                             ticks: {
+                                                                 color: isDarkMode ? '#cbd5e1' : '#1e293b',
+                                                                 font: {
+                                                                     family: 'Outfit',
+                                                                     size: 14,
+                                                                     weight: '800'
+                                                                 }
+                                                             }
+                                                         }
+                                                     }
+                                                 };
+
+                                                 return (
+                                                     <div className="d-flex flex-column justify-content-between h-100 w-100 gap-3">
+                                                         {/* Dynamic Condition Box */}
+                                                         <div className="p-4 rounded-4 text-center border" 
+                                                              style={{ 
+                                                                  background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)', 
+                                                                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                                                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.02)'
+                                                              }}>
+                                                             <h4 className="fw-black mb-0 d-flex align-items-center justify-content-center gap-2 flex-wrap" style={{ color: isDarkMode ? '#cbd5e1' : '#1e293b', fontSize: '1.05rem' }}>
+                                                                 <span>Condition:</span>
+                                                                 <span className="px-4 py-2 shadow-sm fw-black text-uppercase" style={{ ...getConditionStyle(prediction.condition_tomorrow, isDarkMode), fontSize: '0.85rem', letterSpacing: '0.5px' }}>{prediction.condition_tomorrow || 'Cloudy'}</span>
+                                                             </h4>
+                                                         </div>
+                                                         
+                                                         {/* Horizontal Bar Graph (No X-Axis Numbers) */}
+                                                         <div className="w-100 mb-2 mt-1" style={{ height: '135px', position: 'relative' }}>
+                                                             <Chart 
+                                                                 type="bar" 
+                                                                 data={projectionData} 
+                                                                 options={projectionOptions} 
+                                                             />
+                                                         </div>
+
+                                                         <div 
+                                                             className="p-3.5 rounded-4 d-flex align-items-center gap-3 shadow-sm border" 
+                                                             style={{ 
+                                                                 background: isDarkMode ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.05) 100%)' : 'linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(99, 102, 241, 0.06) 100%)', 
+                                                                 borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(37, 99, 235, 0.12)',
+                                                                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.02)'
+                                                             }}
+                                                         >
+                                                             <div className="d-flex align-items-center justify-content-center rounded-circle shadow-sm" style={{ width: '46px', height: '46px', minWidth: '46px', background: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(37, 99, 235, 0.08)' }}>
+                                                                 <span className="fs-3">💡</span>
+                                                             </div>
+                                                             <div>
+                                                                 <div className="fw-black text-uppercase" style={{ fontSize: '0.7rem', letterSpacing: '1px', marginBottom: '2px', color: isDarkMode ? '#60a5fa' : '#2563eb' }}>AI recommendation</div>
+                                                                 <span style={{ color: isDarkMode ? '#cbd5e1' : '#1e3a8a', fontSize: '0.94rem', fontWeight: '800' }}>{prediction.suggestion || 'Light rain likely. Keep a raincoat handy.'}</span>
+                                                             </div>
+                                                         </div>
+                                                         <div>
+                                                             <DownloadReportButton weatherData={currentWeather} predictionData={prediction} hourlyData={hourlyData} locationName={currentWeather?.city} />
+                                                         </div>
+                                                     </div>
+                                                 );
+                                             })()}
+                                         </div>
+                                     </div>
                                 </div>
                             </div>
 
-                              <div className="glass-panel p-5 flex-grow-1 d-flex flex-column" style={{ 
-                                background: 'var(--glass-bg-weather)',
-                                backdropFilter: 'blur(16px)',
-                                WebkitBackdropFilter: 'blur(16px)',
-                                borderRadius: '32px',
-                                border: '1px solid var(--glass-border-weather)',
-                                color: 'var(--text-main-weather)',
-                                boxShadow: '0 15px 45px rgba(0, 0, 0, 0.05)'
-                            }}>
-                                <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-                                    <h2 className="mb-0 fw-black text-truncate" style={{ maxWidth: '70%', fontSize: '1.6rem' }}>{currentWeather?.city}</h2>
-                                    <div className="d-flex align-items-center gap-3">
-                                        <span className="opacity-75 fw-bold text-muted" style={{ fontSize: '1rem' }}>{currentWeather.condition} • {currentWeather.temperature}°C</span>
-                                        <span className="px-2 py-1 rounded small fw-black text-uppercase shadow-sm text-white" style={{ background: 'linear-gradient(45deg, #f43f5e, #fb923c)', letterSpacing: '1px', fontSize: '0.7rem' }}>📍 Live</span>
-                                    </div>
-                                </div>
-                                 <div className="p-4 rounded-4 shadow-sm flex-grow-1" style={{ 
-                                     minHeight: '400px', 
-                                     background: isDarkMode ? 'rgba(6, 10, 23, 0.6)' : '#ffffff', 
-                                     backdropFilter: 'blur(16px)',
-                                     WebkitBackdropFilter: 'blur(16px)',
-                                     border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.05)' 
-                                 }}>
-                                    <HourlyForecast data={hourlyData} themeColor="var(--text-main-weather)" />
-                                </div>
-                            </div>
+                              {(() => {
+                                  const cardTheme = getHourlyCardTheme(currentWeather, isDarkMode);
+                                  return (
+                                      <div className="glass-panel p-5 flex-grow-1 d-flex flex-column" style={{ 
+                                          background: cardTheme.background,
+                                          backdropFilter: cardTheme.backdropFilter || 'blur(16px)',
+                                          WebkitBackdropFilter: cardTheme.backdropFilter || 'blur(16px)',
+                                          borderRadius: '32px',
+                                          border: cardTheme.border,
+                                          color: isDarkMode ? '#cbd5e1' : cardTheme.textColor || 'var(--text-main-weather)',
+                                          boxShadow: cardTheme.boxShadow,
+                                          transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                                      }}>
+                                          <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+                                              <h2 className="mb-0 fw-black text-truncate" style={{ maxWidth: '70%', fontSize: '1.6rem', color: isDarkMode ? '#cbd5e1' : cardTheme.textColor }}>{currentWeather?.city}</h2>
+                                              <div className="d-flex align-items-center gap-3">
+                                                  <span 
+                                                       className="px-4 py-2.5 fw-black text-uppercase shadow-sm text-white animate-pulse d-flex align-items-center gap-2.5" 
+                                                       style={{ 
+                                                           background: '#dc2626', 
+                                                           letterSpacing: '0.8px', 
+                                                           fontSize: '0.92rem', 
+                                                           borderRadius: '8px', 
+                                                           boxShadow: '0 4px 15px rgba(220, 38, 38, 0.35)' 
+                                                       }}
+                                                   >
+                                                       <span>📍 LIVE</span>
+                                                       <span style={{ opacity: 0.65, fontWeight: '300' }}>|</span>
+                                                       <span>{currentWeather.condition} • {currentWeather.temperature}°C</span>
+                                                   </span>
+                                                  
+                                              </div>
+                                          </div>
+                                           <div className="p-4 rounded-4 shadow-sm flex-grow-1" style={{ 
+                                               minHeight: '400px', 
+                                               background: isDarkMode ? 'rgba(6, 10, 23, 0.6)' : 'rgba(255, 255, 255, 0.55)', 
+                                               backdropFilter: 'blur(16px)',
+                                               WebkitBackdropFilter: 'blur(16px)',
+                                               border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(255, 255, 255, 0.25)' 
+                                           }}>
+                                              <HourlyForecast data={hourlyData} themeColor={isDarkMode ? '#cbd5e1' : cardTheme.textColor} currentWeather={currentWeather} />
+                                          </div>
+                                      </div>
+                                  );
+                              })()}
                         </div>
 
                          {/* Right Column */}
@@ -503,8 +784,31 @@ const WeatherPage = ({ locationName }) => {
             </div>
 
             <style>{`
-                .custom-range::-webkit-slider-runnable-track { background: rgba(255, 255, 255, 0.1); height: 4px; border-radius: 2px; }
-                .custom-range::-webkit-slider-thumb { background: #2563eb; border: 2px solid #fff; width: 14px; height: 14px; margin-top: -5px; -webkit-appearance: none; border-radius: 50%; }
+                .custom-range {
+                    -webkit-appearance: none;
+                    background: transparent;
+                    width: 100%;
+                }
+                .custom-range::-webkit-slider-runnable-track { 
+                    background: var(--track-gradient); 
+                    height: 8px; 
+                    border-radius: 4px; 
+                }
+                .custom-range::-webkit-slider-thumb { 
+                    background: var(--thumb-color); 
+                    border: 2.5px solid #ffffff; 
+                    width: 18px; 
+                    height: 18px; 
+                    margin-top: -5px; 
+                    -webkit-appearance: none; 
+                    border-radius: 50%; 
+                    box-shadow: 0 0 10px var(--thumb-color);
+                    cursor: pointer;
+                    transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+                .custom-range::-webkit-slider-thumb:hover {
+                    transform: scale(1.25);
+                }
                 .fw-black { font-weight: 900 !important; }
                 .x-small { font-size: 0.65rem !important; }
                 .cursor-pointer { cursor: pointer; transition: opacity 0.2s; }

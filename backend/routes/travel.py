@@ -698,35 +698,17 @@ def generate_packing_list_ai():
 
 @travel_bp.route('/search', methods=['GET'], strict_slashes=False)
 def proxy_search():
-    """Proxy Nominatim search requests to avoid CORS issues"""
+    """Search locations from the trained local dataset model"""
     query = request.args.get('q', '').strip()
     if not query:
         return jsonify([]), 200
     
     try:
-        headers = {
-            'User-Agent': 'RoamIQ/1.0 (Travel Planner App)',
-            'Accept-Language': 'en-US,en;q=0.9'
-        }
-        
-        params = {
-            'format': 'json',
-            'q': query,
-            'limit': 10,
-            'addressdetails': 1
-        }
-        
-        url = "https://nominatim.openstreetmap.org/search"
-        res = requests.get(url, params=params, headers=headers, timeout=8)
-        
-        if res.status_code == 200:
-            return jsonify(res.json())
-        
-        # Fallback to empty list instead of error for better UI experience
-        return jsonify([])
-
+        from backend.services.location_service import location_model
+        results = location_model.search(query, limit=10)
+        return jsonify(results), 200
     except Exception as e:
-        logger.error(f"Geocoding proxy error for '{query}': {e}")
+        logger.error(f"Local location search error for '{query}': {e}")
         return jsonify([]), 200 # Return empty list on error to keep UI stable
 
 _geo_cache = {}

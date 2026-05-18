@@ -12,11 +12,13 @@ import ExpenseTracker from './ExpenseTracker';
 import WeatherWidget from './WeatherWidget';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { useData } from '../../contexts/DataContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const TripDetails = () => {
     const { id } = useParams();
     const { formatCurrency, convertFromUSD, convertToUSD } = useCurrency();
     const { refreshData } = useData();
+    const { isDarkMode } = useTheme();
     const [trip, setTrip] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('itinerary');
@@ -25,6 +27,7 @@ const TripDetails = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [editFormData, setEditFormData] = useState({
         title: '',
+        destination: '',
         start_date: '',
         end_date: '',
         budget: '',
@@ -43,6 +46,7 @@ const TripDetails = () => {
             // Initialize edit form data
             setEditFormData({
                 title: response.data.trip.title,
+                destination: response.data.trip.destination || '',
                 start_date: response.data.trip.start_date ? new Date(response.data.trip.start_date).toISOString().split('T')[0] : '',
                 end_date: response.data.trip.end_date ? new Date(response.data.trip.end_date).toISOString().split('T')[0] : '',
                 budget: response.data.trip.budget ? convertFromUSD(response.data.trip.budget).toFixed(0) : '',
@@ -76,6 +80,7 @@ const TripDetails = () => {
         try {
             setEditFormData({
                 title: trip.title || '',
+                destination: trip.destination || '',
                 start_date: trip.start_date ? new Date(trip.start_date).toISOString().split('T')[0] : '',
                 end_date: trip.end_date ? new Date(trip.end_date).toISOString().split('T')[0] : '',
                 budget: trip.budget ? convertFromUSD(trip.budget).toFixed(0) : '',
@@ -208,6 +213,16 @@ const TripDetails = () => {
                                 required
                             />
                         </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Destination</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="destination"
+                                value={editFormData.destination}
+                                onChange={handleEditChange}
+                                required
+                            />
+                        </Form.Group>
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
@@ -265,12 +280,16 @@ const TripDetails = () => {
             <div
                 className="position-relative py-5 mb-5"
                 style={{
-                    background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-                    borderBottom: '1px solid rgba(249, 115, 22, 0.1)'
+                    background: isDarkMode 
+                        ? 'linear-gradient(135deg, #0b0f19 0%, #1e293b 100%)' 
+                        : 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                    borderBottom: isDarkMode 
+                        ? '1px solid rgba(249, 115, 22, 0.15)' 
+                        : '1px solid rgba(249, 115, 22, 0.1)'
                 }}
             >
                 <Container>
-                    <Link to="/dashboard" className="text-decoration-none text-muted fw-bold small d-inline-flex align-items-center mb-4 hover-translate-left">
+                    <Link to="/dashboard" className="text-decoration-none fw-bold small d-inline-flex align-items-center mb-4 hover-translate-left" style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
                         <FaArrowLeft className="me-2 text-primary" /> Back to Dashboard
                     </Link>
 
@@ -281,20 +300,32 @@ const TripDetails = () => {
                                     <Badge className="rounded-pill px-3 py-2 text-uppercase fw-bold shadow-sm bg-primary-gradient border-0" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>
                                         {trip.status || 'Planned'}
                                     </Badge>
-                                    <span className="text-muted fw-bold small">•</span>
-                                    <span className="text-muted fw-bold small text-uppercase" style={{ letterSpacing: '1px' }}>{trip.trip_type || 'Leisure'}</span>
+                                    <span className="fw-bold small" style={{ color: isDarkMode ? '#475569' : '#cbd5e1' }}>•</span>
+                                    <span className="fw-bold small text-uppercase" style={{ letterSpacing: '1px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>{trip.trip_type || 'Leisure'}</span>
                                 </div>
 
-                                <h1 className="display-4 fw-black mb-3 text-dark mb-4" style={{ letterSpacing: '-1px' }}>
+                                <h1 className="display-4 fw-black mb-4" style={{ letterSpacing: '-1px', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>
                                     {trip.title}
                                 </h1>
 
-                                <div className="d-flex flex-wrap gap-3 text-secondary fw-medium">
-                                    <div className="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10">
+                                <div className="d-flex flex-wrap gap-3 fw-medium">
+                                    <div 
+                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10"
+                                        style={{ 
+                                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                                            color: isDarkMode ? '#cbd5e1' : '#475569'
+                                        }}
+                                    >
                                         <FaMapMarkerAlt className="text-primary" />
                                         <span className="small fw-bold">{trip.destination}</span>
                                     </div>
-                                    <div className="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10">
+                                    <div 
+                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10"
+                                        style={{ 
+                                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                                            color: isDarkMode ? '#cbd5e1' : '#475569'
+                                        }}
+                                    >
                                         <FaCalendarAlt className="text-primary" />
                                         <span className="small fw-bold">
                                             {trip.start_date ? new Date(trip.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'TBD'}
@@ -302,11 +333,23 @@ const TripDetails = () => {
                                             {trip.end_date ? new Date(trip.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
                                         </span>
                                     </div>
-                                    <div className="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10">
+                                    <div 
+                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10"
+                                        style={{ 
+                                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                                            color: isDarkMode ? '#cbd5e1' : '#475569'
+                                        }}
+                                    >
                                         <FaCoins className="text-primary" />
                                         <span className="small fw-bold">{formatCurrency ? formatCurrency(trip.budget) : (trip.budget || 0)} Budget</span>
                                     </div>
-                                    <div className="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10">
+                                    <div 
+                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm border border-primary border-opacity-10"
+                                        style={{ 
+                                            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                                            color: isDarkMode ? '#cbd5e1' : '#475569'
+                                        }}
+                                    >
                                         <FaUsers className="text-primary" />
                                         <span className="small fw-bold">{trip.group_size || 1} Travelers</span>
                                     </div>

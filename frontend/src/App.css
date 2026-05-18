@@ -145,15 +145,14 @@
   box-shadow: 0 10px 20px rgba(255, 122, 0, 0.2);
 }
 
-/* AI Hub Chat Interface Redesign */
 .chat-interface {
-  max-width: 1400px; /* Wider to feel more like a studio */
-  margin: 0 auto;
-  height: calc(100vh - 100px); /* Taller to use more screen real estate */
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 16px;
-  padding: 16px 24px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  height: calc(100vh - 60px);
+  display: flex;
+  gap: 0;
+  padding: 0;
 }
 
 .chat-history {

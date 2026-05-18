@@ -8,6 +8,8 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     // Fallback if weatherData isn't loaded yet
     const currentWeather = weatherData || { 
@@ -46,13 +48,20 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
         if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
 
         if (query.length > 2) {
+            setIsSearching(true);
             debounceTimeoutRef.current = setTimeout(async () => {
                 try {
-                    await axios.get(`/api/travel/search?q=${encodeURIComponent(query)}`);
+                    const response = await axios.get(`/api/travel/search?q=${encodeURIComponent(query)}`);
+                    setSearchResults(response.data || []);
                 } catch {
                     console.error("Search failed");
+                    setSearchResults([]);
+                } finally {
+                    setIsSearching(false);
                 }
             }, 500);
+        } else {
+            setSearchResults([]);
         }
     };
 
@@ -88,7 +97,7 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
                 />
             )}
 
-            <div className={`sidebar-container d-flex flex-column ${isMobileOpen ? 'mobile-open' : ''}`}
+            <div className={`sidebar-container d-flex flex-column custom-scrollbar ${isMobileOpen ? 'mobile-open' : ''}`}
                  style={{ 
                      width: '240px', 
                      background: 'var(--sidebar-bg)', 
@@ -104,7 +113,8 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
                      transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                      padding: '24px 20px',
                      borderRight: '1px solid var(--glass-border-weather)',
-                     boxShadow: '4px 0 24px rgba(0, 0, 0, 0.02)'
+                     boxShadow: '4px 0 24px rgba(0, 0, 0, 0.02)',
+                     overflowY: 'auto'
                  }}>
             
             <div className="d-flex flex-column align-items-center mb-4">
@@ -205,34 +215,60 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
                 </div>
             </div>
 
-            <div className="flex-grow-1 overflow-auto custom-scrollbar mb-4">
+            <div className="mb-4">
                 <h6 className="text-uppercase fw-bold mb-3 px-1" style={{ fontSize: '0.65rem', letterSpacing: '1.5px', color: 'var(--text-main-weather)', opacity: 0.7 }}>Command: Cities</h6>
                 <div className="d-flex flex-column gap-2">
-                    {[
-                        { name: 'COIMBATORE', country: 'INDIA', lat: 11.0168, lon: 76.9558 },
-                        { name: 'NEW YORK', country: 'USA', lat: 40.71, lon: -74.00 },
-                        { name: 'LONDON', country: 'UK', lat: 51.50, lon: -0.12 },
-                        { name: 'TOKYO', country: 'JAPAN', lat: 35.67, lon: 139.65 }
-                    ].map((city) => {
-                        const isSelected = currentWeather.city && currentWeather.city.toUpperCase().includes(city.name);
-                        return (
-                            <div 
-                                key={city.name} 
-                                className="cursor-pointer py-2 px-3 rounded-4 transition-all d-flex flex-column shadow-sm hover-lift" 
-                                style={{ 
-                                    background: isSelected ? 'var(--accent-weather, #ff6b00)' : 'var(--glass-bg-weather)',
-                                    border: isSelected ? '1px solid var(--accent-weather, #ff6b00)' : '1px solid var(--glass-border-weather)',
-                                    backdropFilter: isSelected ? 'none' : 'blur(10px)',
-                                    WebkitBackdropFilter: isSelected ? 'none' : 'blur(10px)',
-                                    color: isSelected ? 'white' : 'var(--text-main-weather)',
-                                }}
-                                onClick={() => handleCitySelect({ name: city.name, latitude: city.lat, longitude: city.lon })}
-                            >
-                                <div className="fw-black" style={{ fontSize: '0.85rem' }}>{city.name}</div>
-                                <div style={{ fontSize: '0.65rem', fontWeight: '700', color: isSelected ? 'rgba(255, 255, 255, 0.8)' : 'var(--text-main-weather)', opacity: isSelected ? 1 : 0.6 }}>{city.country}</div>
-                            </div>
-                        );
-                    })}
+                    {searchQuery.length > 2 ? (
+                        isSearching ? (
+                            <div className="text-center py-3 text-muted small fw-bold">Searching...</div>
+                        ) : searchResults.length > 0 ? (
+                            searchResults.map((result, idx) => (
+                                <div 
+                                    key={idx} 
+                                    className="cursor-pointer py-2 px-3 rounded-4 transition-all d-flex flex-column shadow-sm hover-lift" 
+                                    style={{ 
+                                        background: 'var(--glass-bg-weather)',
+                                        border: '1px solid var(--glass-border-weather)',
+                                        backdropFilter: 'blur(10px)',
+                                        WebkitBackdropFilter: 'blur(10px)',
+                                        color: 'var(--text-main-weather)',
+                                    }}
+                                    onClick={() => handleCitySelect({ name: result.name || result.display_name.split(',')[0], latitude: result.lat, longitude: result.lon })}
+                                >
+                                    <div className="fw-black text-truncate" style={{ fontSize: '0.85rem' }}>{result.name || result.display_name.split(',')[0]}</div>
+                                    <div className="text-truncate" style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-main-weather)', opacity: 0.6 }}>{result.display_name}</div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-3 text-muted small fw-bold">No results found.</div>
+                        )
+                    ) : (
+                        [
+                            { name: 'COIMBATORE', country: 'INDIA', lat: 11.0168, lon: 76.9558 },
+                            { name: 'NEW YORK', country: 'USA', lat: 40.71, lon: -74.00 },
+                            { name: 'LONDON', country: 'UK', lat: 51.50, lon: -0.12 },
+                            { name: 'TOKYO', country: 'JAPAN', lat: 35.67, lon: 139.65 }
+                        ].map((city) => {
+                            const isSelected = currentWeather.city && currentWeather.city.toUpperCase().includes(city.name);
+                            return (
+                                <div 
+                                    key={city.name} 
+                                    className="cursor-pointer py-2 px-3 rounded-4 transition-all d-flex flex-column shadow-sm hover-lift" 
+                                    style={{ 
+                                        background: isSelected ? 'var(--accent-weather, #ff6b00)' : 'var(--glass-bg-weather)',
+                                        border: isSelected ? '1px solid var(--accent-weather, #ff6b00)' : '1px solid var(--glass-border-weather)',
+                                        backdropFilter: isSelected ? 'none' : 'blur(10px)',
+                                        WebkitBackdropFilter: isSelected ? 'none' : 'blur(10px)',
+                                        color: isSelected ? 'white' : 'var(--text-main-weather)',
+                                    }}
+                                    onClick={() => handleCitySelect({ name: city.name, latitude: city.lat, longitude: city.lon })}
+                                >
+                                    <div className="fw-black" style={{ fontSize: '0.85rem' }}>{city.name}</div>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: '700', color: isSelected ? 'rgba(255, 255, 255, 0.8)' : 'var(--text-main-weather)', opacity: isSelected ? 1 : 0.6 }}>{city.country}</div>
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
@@ -243,7 +279,10 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
                     .sidebar-container { transform: translateX(-100%); width: 85% !important; max-width: 280px; }
                     .sidebar-container.mobile-open { transform: translateX(0); }
                 }
-                .custom-scrollbar::-webkit-scrollbar { width: 0px; }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 107, 0, 0.25); border-radius: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 107, 0, 0.5); }
                 .cursor-pointer { cursor: pointer; transition: opacity 0.2s; }
                 .cursor-pointer:hover { opacity: 0.8; }
             `}</style>

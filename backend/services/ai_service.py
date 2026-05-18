@@ -641,22 +641,45 @@ class AIService:
         except:
             return {"error": "Intelligence gathering timed out."}
 
-    async def generate_travel_postcard(self, trip_id: int, user_id: int) -> Dict[str, Any]:
+    async def generate_travel_postcard(self, trip_id: Optional[int] = None, user_id: Optional[int] = None, destination: Optional[str] = None, title: Optional[str] = None) -> Dict[str, Any]:
         """
         Unique Feature: AI Travel Postcard
         Creates a poetic summary of the trip.
         """
-        from backend.models.trip import Trip
-        trip = Trip.query.filter_by(id=trip_id, user_id=user_id).first()
-        if not trip: return {"error": "Trip not found"}
+        if trip_id and user_id:
+            try:
+                from backend.models.trip import Trip
+                trip = Trip.query.filter_by(id=int(trip_id), user_id=int(user_id)).first()
+                if trip:
+                    destination = trip.destination
+                    title = trip.title
+            except Exception as e:
+                logger.error(f"Error loading trip for postcard: {e}")
         
-        prompt = f"Write a charming, poetic 3-sentence postcard message from {trip.destination} reflecting on a trip titled '{trip.title}'."
+        if not destination:
+            destination = "Goa, India"
+            
+        if not title:
+            title = "A Special Journey"
+            
+        prompt = f"Write a charming, poetic 3-sentence postcard message from {destination} reflecting on a trip titled '{title}'."
         message = await llm_provider.generate_response(prompt=prompt, system_prompt="You are a travel writer.")
         
+        # Resolve username safely
+        username = "Traveler"
+        if user_id:
+            try:
+                from backend.models.user import User
+                user = User.query.get(int(user_id))
+                if user:
+                    username = user.username
+            except Exception:
+                pass
+                
         return {
             "postcard_text": message,
-            "destination": trip.destination,
-            "signature": f"Sent from RoamIQ by {trip.user.username if trip.user else 'Traveler'}"
+            "destination": destination,
+            "signature": f"Sent from RoamIQ by {username}"
         }
 
     async def update_trip_with_ai(

@@ -25,6 +25,8 @@ wheels/
 venv/
 ENV/
 .env
+.env.local
+.env.*
 
 # Flask
 instance/

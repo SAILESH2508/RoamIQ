@@ -30,7 +30,7 @@ ChartJS.register(
     Filler
 );
 
-const HourlyForecast = ({ data }) => {
+const HourlyForecast = ({ data, currentWeather }) => {
     const { isDarkMode } = useTheme();
     const resolvedThemeColor = isDarkMode ? '#f8fafc' : '#0f172a';
 
@@ -41,15 +41,58 @@ const HourlyForecast = ({ data }) => {
     const temps = data.temperature_2m.slice(0, 24);
     const rain = data.rain ? data.rain.slice(0, 24) : new Array(24).fill(0);
 
-        const chartData = {
+    // Determine dynamic temperature line styling based on weather condition and light/dark theme toggle
+    // Ensures temperature NEVER conflicts with the blue water/rainfall bar color
+    const getTempLineStyle = () => {
+        const defaultStyle = isDarkMode 
+            ? { border: '#f43f5e', fill: 'rgba(244, 63, 94, 0.12)' } 
+            : { border: '#ef4444', fill: 'rgba(239, 68, 68, 0.05)' };
+
+        if (!currentWeather) return defaultStyle;
+        
+        const cond = (currentWeather.condition || '').toLowerCase();
+        const isRain = cond.includes('rain') || cond.includes('drizzle') || cond.includes('storm') || cond.includes('shower');
+        const isCloudy = cond.includes('cloud') || cond.includes('overcast') || cond.includes('mist') || cond.includes('fog');
+        
+        if (isRain) {
+            return isDarkMode ? {
+                border: '#c084fc', // Glowing Royal Orchid Purple in dark mode (distinct from blue rain!)
+                fill: 'rgba(192, 132, 252, 0.12)'
+            } : {
+                border: '#7c3aed', // Rich Deep Violet in light mode
+                fill: 'rgba(124, 58, 237, 0.05)'
+            };
+        } else if (isCloudy) {
+            return isDarkMode ? {
+                border: '#fbbf24', // Glowing Warm Amber in dark mode
+                fill: 'rgba(251, 191, 36, 0.12)'
+            } : {
+                border: '#d97706', // Rich Gold Copper in light mode
+                fill: 'rgba(217, 119, 6, 0.05)'
+            };
+        }
+        
+        // Sunny/Clear/Default
+        return isDarkMode ? {
+            border: '#f43f5e', // Glowing Sunset Crimson in dark mode
+            fill: 'rgba(244, 63, 94, 0.12)'
+        } : {
+            border: '#ef4444', // Hot Sunset Red in light mode
+            fill: 'rgba(239, 68, 68, 0.05)'
+        };
+    };
+    
+    const tempStyle = getTempLineStyle();
+
+    const chartData = {
         labels: next24Hours,
         datasets: [
             {
                 type: 'line',
                 label: 'Temperature (°C)',
                 data: temps,
-                borderColor: '#f97316',
-                backgroundColor: 'rgba(249, 115, 22, 0.15)', // Premium tinted background fill
+                borderColor: tempStyle.border,
+                backgroundColor: tempStyle.fill,
                 borderWidth: 4,
                 pointRadius: 0,
                 tension: 0.4,
@@ -60,7 +103,7 @@ const HourlyForecast = ({ data }) => {
                 type: 'bar',
                 label: 'Rainfall (mm)',
                 data: rain,
-                backgroundColor: '#ff9d4d',
+                backgroundColor: 'rgba(59, 130, 246, 0.85)', // Beautiful, clear sky-blue for water/rainfall
                 borderRadius: 4,
                 barThickness: 20,
                 yAxisID: 'y1',

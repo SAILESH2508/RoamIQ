@@ -1,5 +1,37 @@
 import React from 'react';
 
+const getWeatherVisuals = (code) => {
+    if (code === 0) { // Sunny
+        return {
+            gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(239, 68, 68, 0.04) 100%)',
+            color: '#f59e0b',
+            glowColor: 'rgba(245, 158, 11, 0.12)',
+            borderColor: 'rgba(245, 158, 11, 0.18)'
+        };
+    } else if (code <= 3) { // Partly Cloudy
+        return {
+            gradient: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%)',
+            color: '#0ea5e9',
+            glowColor: 'rgba(14, 165, 233, 0.12)',
+            borderColor: 'rgba(14, 165, 233, 0.18)'
+        };
+    } else if (code <= 57 || code <= 67 || code <= 82 || code <= 99) { // Rainy/Stormy
+        return {
+            gradient: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%)',
+            color: '#3b82f6',
+            glowColor: 'rgba(59, 130, 246, 0.12)',
+            borderColor: 'rgba(59, 130, 246, 0.18)'
+        };
+    } else { // Cloudy/Foggy
+        return {
+            gradient: 'linear-gradient(135deg, rgba(148, 163, 184, 0.08) 0%, rgba(71, 85, 105, 0.04) 100%)',
+            color: '#94a3b8',
+            glowColor: 'rgba(148, 163, 184, 0.08)',
+            borderColor: 'rgba(148, 163, 184, 0.15)'
+        };
+    }
+};
+
 const DailyForecast = ({ data, locationName }) => {
     if (!data || !data.time) return null;
 
@@ -47,13 +79,20 @@ const DailyForecast = ({ data, locationName }) => {
                     const range = Math.max(1, globalMax - globalMin);
                     const leftPos = ((min - globalMin) / range) * 100;
                     const width = ((max - min) / range) * 100;
+                    
+                    const visuals = getWeatherVisuals(codes[index]);
 
                     return (
-                        <div key={day} className="d-flex align-items-center mb-3 p-3 rounded-4 shadow-sm" style={{ 
-                            background: 'var(--glass-bg-weather)',
-                            border: '1px solid var(--glass-border-weather)',
-                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
-                        }}>
+                        <div 
+                            key={day} 
+                            className="d-flex align-items-center mb-3 p-3 rounded-4 shadow-sm daily-forecast-row-card" 
+                            style={{ 
+                                background: visuals.gradient,
+                                border: `1px solid ${visuals.borderColor}`,
+                                boxShadow: `0 4px 12px rgba(0, 0, 0, 0.02), 0 0 10px ${visuals.glowColor}`,
+                                transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                            }}
+                        >
                             <div style={{ width: '75px' }}>
                                 <span className="fw-black" style={{ fontSize: '1.05rem', color: 'var(--text-main-weather)' }}>
                                     {index === 0 ? 'Today' : getDayName(day)}
@@ -65,8 +104,8 @@ const DailyForecast = ({ data, locationName }) => {
                             </div>
 
                             <div className="flex-grow-1 mx-3 d-flex align-items-center gap-3">
-                                <span className="fw-black opacity-75" style={{ fontSize: '1rem', width: '35px', color: 'var(--text-main-weather)' }}>{min}°</span>
-                                <div className="flex-grow-1 position-relative rounded-pill" style={{ height: '12px', background: 'rgba(255, 255, 255, 0.1)' }}>
+                                <span className="fw-black" style={{ fontSize: '1rem', width: '35px', color: '#3b82f6' }}>{min}°</span>
+                                <div className="flex-grow-1 position-relative rounded-pill" style={{ height: '10px', background: 'rgba(255, 255, 255, 0.12)' }}>
                                     <div
                                         className="position-absolute rounded-pill"
                                         style={{
@@ -74,16 +113,26 @@ const DailyForecast = ({ data, locationName }) => {
                                             width: `${width}%`,
                                             top: 0,
                                             bottom: 0,
-                                            background: 'linear-gradient(90deg, #f97316 0%, #fbbf24 35%, #22c55e 65%, #3b82f6 100%)'
+                                            background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 50%, #f59e0b 100%)',
+                                            boxShadow: '0 0 6px rgba(245, 158, 11, 0.25)'
                                         }}
                                     />
                                 </div>
-                                <span className="fw-black" style={{ fontSize: '1.1rem', width: '35px', color: 'var(--text-main-weather)' }}>{max}°</span>
+                                <span className="fw-black" style={{ fontSize: '1.1rem', width: '35px', color: '#f43f5e' }}>{max}°</span>
                             </div>
                         </div>
                     );
                 })}
             </div>
+            
+            <style>{`
+                .daily-forecast-row-card:hover {
+                    transform: translateY(-2px) scale(1.015);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04), 0 0 16px rgba(0, 0, 0, 0.06) !important;
+                    filter: brightness(1.05);
+                    cursor: pointer;
+                }
+            `}</style>
 
             <div className="mt-auto pt-4 border-top" style={{ borderColor: 'var(--glass-border-weather)' }}>
                 <div className="text-primary fw-black text-uppercase mb-2" style={{ fontSize: '0.8rem', letterSpacing: '1px' }}>Weekly Intelligence Outlook</div>
