@@ -24,7 +24,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        npm ci --legacy-peer-deps
+        npm install --legacy-peer-deps
         
     - name: Build frontend
       run: |
@@ -38,7 +38,7 @@ jobs:
         
     - name: Install Python dependencies
       run: |
-        pip install -r requirements.txt
+        pip install Flask Flask-SQLAlchemy Flask-CORS Flask-JWT-Extended requests python-dotenv bcrypt geopy aiohttp flasgger Werkzeug
         
     - name: Test Python
       run: python -c "print('Python setup successful')"
