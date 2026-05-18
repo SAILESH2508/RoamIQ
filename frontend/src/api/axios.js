@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Get the API URL from environment variables
 // In development, this is empty (uses proxy)
-// In production, this should be your Render backend URL (e.g., https://roamiq-backend.onrender.com)
+// In production, this should be your production backend URL (e.g., https://api.roamiq.com)
 // In development, we talk directly to localhost:5000 to bypass proxy issues
 // In production, use the environment variable
 const API_URL = process.env.NODE_ENV === 'development' 

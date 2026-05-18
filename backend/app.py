@@ -28,7 +28,7 @@ def create_app():
     # Database Configuration
     database_url = os.getenv('DATABASE_URL')
     
-    # Normalize Postgres URL if present (Render/Heroku style)
+    # Normalize Postgres URL if present (PostgreSQL standard style)
     if database_url and database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
         
