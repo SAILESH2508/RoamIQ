@@ -1,4 +1,5 @@
 import logging
+import os
 import json
 from typing import Dict, List, Optional, Any
 from backend.services.ai.llm_provider import llm_provider
@@ -153,7 +154,7 @@ class AIService:
                 f"ALWAYS use {currency} for any financial estimates or costs. "
                 "IMPORTANT: If you are generating a travel plan or itinerary, you MUST ALWAYS include a structured JSON block at the end of your response wrapped in ```json ... ``` tags. "
                 "The JSON must follow this format: "
-                "{\"trip_title\": \"...\", \"destination\": \"...\", \"estimated_total_cost\": 0, \"days\": [...]}. "
+                "{\"trip_title\": \"...\", \"destination\": \"...\", \"estimated_total_cost\": 0, \"days\": [{\"day\": 1, \"title\": \"...\", \"activities\": [\"...\"]}]}."
                 "This allows the system to save the trip correctly. "
                 "IMPORTANT COST RULES: "
                 "1. Keep all travel estimates and costs highly realistic and BUDGET-FRIENDLY. Users find current estimates too expensive. "
@@ -374,7 +375,7 @@ class AIService:
                  Return ONLY a JSON object. If NOT a receipt, return "NOT_RECEIPT".
                  """
                  file_part = types.Part.from_bytes(data=file_data, mime_type=mime_type)
-                 res = await llm_provider.generate_response(prompt=[receipt_prompt, file_part], model_name='gemini-1.5-flash')
+                 res = await llm_provider.generate_response(prompt=[receipt_prompt, file_part], model_name=os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash'))
                  
                  if "NOT_RECEIPT" not in res.upper() and ("{" in res):
                      try:
@@ -413,7 +414,7 @@ class AIService:
              # Call Gemini via LLM Provider (enables fallback)
              summary = await llm_provider.generate_response(
                 prompt=contents,
-                model_name='gemini-1.5-flash'
+                model_name=os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash')
              )
              
              return {
@@ -448,7 +449,7 @@ class AIService:
              
              text = await llm_provider.generate_response(
                 prompt=prompt,
-                model_name='gemini-1.5-flash'
+                model_name=os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash')
              )
              
              text = text.strip() if text else ""

@@ -126,11 +126,25 @@ const MapWidget = ({ trips = [], userLocation = null, fillContainer = false }) =
     const [geocodedTrips, setGeocodedTrips] = React.useState([]);
     const [searchQuery, setSearchQuery] = React.useState('');
     const [searchResults, setSearchResults] = React.useState(null);
+    const [searchHistory, setSearchHistory] = React.useState([]);
     
     // Nearby Points of Interest (POIs) State
     const [localPOIs, setLocalPOIs] = React.useState([]);
     const [poiFilter, setPoiFilter] = React.useState('all');
     const [isPoiLoading, setIsPoiLoading] = React.useState(false);
+
+    const fetchSearchHistory = async () => {
+        try {
+            const res = await api.get('/api/travel/history');
+            setSearchHistory(res.data || []);
+        } catch (err) {
+            console.error("Failed to load search history in map", err);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchSearchHistory();
+    }, []);
 
     // Client-side geocoding for trips that only have a destination name
     React.useEffect(() => {
@@ -177,15 +191,38 @@ const MapWidget = ({ trips = [], userLocation = null, fillContainer = false }) =
         try {
             const res = await api.get(`/api/travel/search?q=${encodeURIComponent(searchQuery)}`);
             if (res.data && res.data.length > 0) {
-                setSearchResults({
+                const foundPlace = {
                     lat: parseFloat(res.data[0].lat),
                     lng: parseFloat(res.data[0].lon),
                     name: res.data[0].display_name
-                });
+                };
+                setSearchResults(foundPlace);
+
+                // Save search to history in database
+                try {
+                    await api.post('/api/travel/history', {
+                        place_name: res.data[0].name || searchQuery,
+                        latitude: foundPlace.lat,
+                        longitude: foundPlace.lng,
+                        display_name: res.data[0].display_name
+                    });
+                    fetchSearchHistory();
+                } catch (historyErr) {
+                    console.warn("Failed to save map search history", historyErr);
+                }
             }
         } catch (err) {
             console.error("Search failed", err);
         }
+    };
+
+    const handleRecentSearchClick = (item) => {
+        setSearchQuery(item.place_name);
+        setSearchResults({
+            lat: item.latitude,
+            lng: item.longitude,
+            name: item.display_name || item.place_name
+        });
     };
 
     const center = React.useMemo(() => {
@@ -301,6 +338,35 @@ const MapWidget = ({ trips = [], userLocation = null, fillContainer = false }) =
                     )}
                 </div>
             </div>
+
+            {/* Recent Searches Bar */}
+            {searchHistory && searchHistory.length > 0 && (
+                <div className="recent-map-searches d-flex flex-wrap gap-2 px-4 py-2 border-bottom align-items-center" style={{ 
+                    background: isDarkMode ? 'rgba(30, 41, 59, 0.25)' : 'rgba(248, 249, 250, 0.5)', 
+                    borderColor: 'var(--glass-border-weather)' 
+                }}>
+                    <span className="small text-muted fw-black" style={{ fontSize: '0.65rem', letterSpacing: '0.5px' }}>🕒 RECENT SEARCHES:</span>
+                    {searchHistory.slice(0, 5).map((item) => (
+                        <Badge 
+                            key={item.id} 
+                            bg="secondary" 
+                            className="rounded-pill px-2.5 py-1 text-truncate hover-lift text-decoration-none" 
+                            style={{ 
+                                fontSize: '0.65rem', 
+                                cursor: 'pointer', 
+                                background: 'rgba(255, 122, 0, 0.12)', 
+                                color: '#ff7a00', 
+                                border: '1px solid rgba(255, 122, 0, 0.2)', 
+                                maxWidth: '140px',
+                                transition: 'all 0.2s'
+                            }}
+                            onClick={() => handleRecentSearchClick(item)}
+                        >
+                            📍 {item.place_name}
+                        </Badge>
+                    ))}
+                </div>
+            )}
 
             {/* Nearby POI Filter Bar */}
             {localPOIs.length > 0 && (

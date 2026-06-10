@@ -8,8 +8,9 @@ from backend.models.packing_list import PackingItem
 from backend.models.preference import UserPreference
 from backend.extensions import db
 from backend.models.ticket import Ticket
+from backend.models.search_history import SearchHistory
 from backend.services.ai_service import AIService
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 import json
 import logging
 import requests
@@ -696,6 +697,111 @@ def generate_packing_list_ai():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ==========================================
+# SEARCH HISTORY ROUTES
+# ==========================================
+
+@travel_bp.route('/history', methods=['GET'])
+@jwt_required()
+def get_search_history():
+    """Retrieve search history for the authenticated user"""
+    try:
+        user_id = get_jwt_identity()
+        history = SearchHistory.query.filter_by(user_id=user_id).order_by(SearchHistory.searched_at.desc()).all()
+        return jsonify([item.to_dict() for item in history]), 200
+    except Exception as e:
+        logger.error(f"Error fetching search history for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@travel_bp.route('/history', methods=['POST'])
+@jwt_required()
+def add_search_history():
+    """Add a new place search to history"""
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        place_name = data.get('place_name')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        display_name = data.get('display_name')
+        
+        if not place_name or latitude is None or longitude is None:
+            return jsonify({'error': 'place_name, latitude and longitude are required'}), 400
+            
+        # Clean coordinates
+        try:
+            lat = float(latitude)
+            lon = float(longitude)
+        except ValueError:
+            return jsonify({'error': 'Invalid latitude/longitude'}), 400
+
+        # Avoid duplicates: check if this place is already in history for this user
+        existing = SearchHistory.query.filter_by(user_id=user_id, place_name=place_name).first()
+        if existing:
+            # Update the search time to move it to the top
+            existing.searched_at = datetime.now(timezone.utc)
+            db.session.commit()
+            return jsonify(existing.to_dict()), 200
+            
+        # Create new history entry
+        new_entry = SearchHistory(
+            user_id=user_id,
+            place_name=place_name,
+            latitude=lat,
+            longitude=lon,
+            display_name=display_name,
+            searched_at=datetime.now(timezone.utc)
+        )
+        
+        db.session.add(new_entry)
+        
+        # Enforce history limit (e.g. keep last 20 entries)
+        history = SearchHistory.query.filter_by(user_id=user_id).order_by(SearchHistory.searched_at.desc()).all()
+        if len(history) >= 20:
+            # Delete oldest entries
+            for old_item in history[19:]:
+                db.session.delete(old_item)
+                
+        db.session.commit()
+        return jsonify(new_entry.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding search history for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@travel_bp.route('/history/<int:history_id>', methods=['DELETE'])
+@jwt_required()
+def delete_search_history_item(history_id):
+    """Delete a specific search history item"""
+    try:
+        user_id = get_jwt_identity()
+        item = SearchHistory.query.filter_by(id=history_id, user_id=user_id).first()
+        if not item:
+            return jsonify({'error': 'History item not found'}), 404
+            
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': 'History item deleted'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting search history item {history_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@travel_bp.route('/history', methods=['DELETE'])
+@jwt_required()
+def clear_search_history():
+    """Clear all search history for the user"""
+    try:
+        user_id = get_jwt_identity()
+        SearchHistory.query.filter_by(user_id=user_id).delete()
+        db.session.commit()
+        return jsonify({'message': 'Search history cleared successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error clearing search history for user {get_jwt_identity()}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @travel_bp.route('/search', methods=['GET'], strict_slashes=False)
 def proxy_search():
     """Search locations from the trained local dataset model"""
@@ -765,18 +871,28 @@ def proxy_reverse():
         logger.error(f"Reverse geocoding proxy error: {e}")
         return jsonify({'error': f'Internal Reverse Error: {str(e)}'}), 500
 
-def generate_mock_weather(lat, lon, city):
+def generate_mock_weather(lat, lon, city, start_date=None):
     """Generates highly realistic fallback mock weather data when API is unavailable"""
     import random
     from datetime import datetime, timedelta
     
+    if not start_date:
+        start_date = datetime.now().date()
+    elif isinstance(start_date, str):
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = datetime.now().date()
+            
     try:
         lat_float = float(lat)
     except:
         lat_float = 11.0168
         
     base_temp = 28.0 if 8.0 <= lat_float <= 15.0 else 22.0
-    is_day_now = 1 if 6 <= datetime.now().hour <= 18 else 0
+    
+    is_today = start_date == datetime.now().date()
+    is_day_now = (1 if 6 <= datetime.now().hour <= 18 else 0) if is_today else 1
     
     # Generate 48 hourly steps
     hourly_temps = []
@@ -786,7 +902,7 @@ def generate_mock_weather(lat, lon, city):
     hourly_codes = []
     hourly_is_day = []
     
-    start_hour = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=12)
+    start_hour = datetime.combine(start_date, datetime.min.time())
     for i in range(48):
         time_step = start_hour + timedelta(hours=i)
         hour = time_step.hour
@@ -808,9 +924,8 @@ def generate_mock_weather(lat, lon, city):
     daily_sunset = []
     daily_precip_max = []
     
-    today = datetime.now().date()
     for i in range(7):
-        day_step = today + timedelta(days=i)
+        day_step = start_date + timedelta(days=i)
         daily_time.append(day_step.strftime('%Y-%m-%d'))
         daily_temp_max.append(round(base_temp + 5.0 + random.uniform(-1, 1), 1))
         daily_temp_min.append(round(base_temp - 5.0 + random.uniform(-1, 1), 1))
@@ -821,7 +936,7 @@ def generate_mock_weather(lat, lon, city):
 
     return {
         'temperature': round(base_temp + random.uniform(-2, 2), 1),
-        'description': "Partly Cloudy (Simulated Fallback)",
+        'description': "Partly Cloudy",
         'weather_code': 2,
         'humidity': random.randint(60, 75),
         'wind_speed': round(12.5 + random.uniform(-2, 2), 1),
@@ -853,9 +968,67 @@ def get_current_weather():
     lat = request.args.get('lat', 11.0168)
     lon = request.args.get('lon', 76.9558)
     city = request.args.get('city', 'Coimbatore')
+    date_str = request.args.get('date')
     
+    is_today = True
+    target_date = datetime.now().date()
+    
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            if target_date != datetime.now().date():
+                is_today = False
+        except ValueError:
+            pass
+            
     try:
-        # Open-Meteo API URL
+        if not is_today:
+            end_date_str = (target_date + timedelta(days=6)).strftime('%Y-%m-%d')
+            formatted_start_date = target_date.strftime('%Y-%m-%d')
+            
+            if target_date < datetime.now().date():
+                # Past: Archive API
+                url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={formatted_start_date}&end_date={end_date_str}&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto"
+            else:
+                # Future: Forecast API
+                url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&start_date={formatted_start_date}&end_date={end_date_str}&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,sunshine_duration,uv_index_max,uv_index_clear_sky_max,precipitation_sum,rain_sum,showers_sum,snowfall_sum,precipitation_hours,precipitation_probability_max&timezone=auto"
+            
+            res = requests.get(url, timeout=10)
+            if res.status_code != 200:
+                raise requests.exceptions.RequestException(f"Open-Meteo returned status code {res.status_code}")
+                
+            data = res.json()
+            
+            # Extract midday hour (approx index 12)
+            temp = data['hourly']['temperature_2m'][12] if 'hourly' in data and len(data['hourly']['temperature_2m']) > 12 else (data['daily']['temperature_2m_max'][0] if 'daily' in data else 25)
+            code = data['daily']['weather_code'][0] if 'daily' in data and len(data['daily']['weather_code']) > 0 else 0
+            humidity = data['hourly']['relative_humidity_2m'][12] if 'hourly' in data and 'relative_humidity_2m' in data['hourly'] and len(data['hourly']['relative_humidity_2m']) > 12 else 60
+            wind_speed = data['hourly']['wind_speed_10m'][12] if 'hourly' in data and 'wind_speed_10m' in data['hourly'] and len(data['hourly']['wind_speed_10m']) > 12 else 10
+            
+            hourly_data = data['hourly']
+            if 'precipitation_probability' not in hourly_data:
+                hourly_data['precipitation_probability'] = [0] * len(hourly_data['time'])
+            if 'is_day' not in hourly_data:
+                hourly_data['is_day'] = [1] * len(hourly_data['time'])
+                
+            daily_data = data['daily']
+            if 'precipitation_probability_max' not in daily_data:
+                daily_data['precipitation_probability_max'] = [0] * len(daily_data['time'])
+                
+            weather_data = {
+                'temperature': temp,
+                'description': get_wmo_description(code),
+                'weather_code': code,
+                'humidity': humidity,
+                'wind_speed': wind_speed,
+                'city': city,
+                'is_day': 1,
+                'hourly': hourly_data,
+                'daily': daily_data
+            }
+            return jsonify(weather_data)
+        
+        # Else: Fetch today's current live weather
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,weather_code,pressure_msl,surface_pressure,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky,is_day,sunshine_duration&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,sunshine_duration,uv_index_max,uv_index_clear_sky_max,precipitation_sum,rain_sum,showers_sum,snowfall_sum,precipitation_hours,precipitation_probability_max&timezone=auto"
         
         res = requests.get(url, timeout=10)
@@ -864,7 +1037,6 @@ def get_current_weather():
             
         data = res.json()
         
-        # Map to our frontend format
         weather_data = {
             'temperature': data['current']['temperature_2m'],
             'description': get_wmo_description(data['current']['weather_code']),
@@ -881,7 +1053,7 @@ def get_current_weather():
     except Exception as e:
         logger.warning(f"Weather Fetch Timeout/Error: {e}. Falling back to realistic simulated weather data for {city}.")
         try:
-            fallback_data = generate_mock_weather(lat, lon, city)
+            fallback_data = generate_mock_weather(lat, lon, city, start_date=target_date)
             return jsonify(fallback_data), 200
         except Exception as fallback_err:
             logger.error(f"Weather Fallback Generator Error: {fallback_err}")

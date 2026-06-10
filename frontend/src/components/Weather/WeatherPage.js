@@ -180,6 +180,22 @@ const WeatherPage = ({ locationName }) => {
     const DEFAULT_LON = 76.9558;
     const DEFAULT_CITY = 'Coimbatore, Tamil Nadu, India';
 
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [searchHistory, setSearchHistory] = useState([]);
+
+    const fetchSearchHistory = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/travel/history');
+            setSearchHistory(res.data || []);
+        } catch (e) {
+            console.error("Failed to fetch search history", e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchSearchHistory();
+    }, [fetchSearchHistory]);
+
     const handlePredictManual = useCallback(async (t, h, r, w) => {
         setPrediction({ prediction: "Analyzing...", predicted_temperature: "...", predicted_rainfall: "...", condition_tomorrow: "Loading..." });
         try {
@@ -288,8 +304,9 @@ const WeatherPage = ({ locationName }) => {
             const cacheTime = localStorage.getItem('roamiq-weather-cache-time');
             const lastViewed = localStorage.getItem('roamiq-last-viewed-weather-location');
             
+            const isSelectedDateToday = selectedDate === new Date().toISOString().split('T')[0];
             let isCacheValid = false;
-            if (cachedWeather && cachedHourly && cachedDaily && cacheTime && lastViewed) {
+            if (isSelectedDateToday && cachedWeather && cachedHourly && cachedDaily && cacheTime && lastViewed) {
                 try {
                     const parsedLast = JSON.parse(lastViewed);
                     const age = Date.now() - parseInt(cacheTime);
@@ -330,7 +347,7 @@ const WeatherPage = ({ locationName }) => {
             }
 
             try {
-                const res = await axios.get(`/api/travel/current?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}`);
+                const res = await axios.get(`/api/travel/current?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&date=${selectedDate}`);
                 const data = res.data;
                 
                 const weatherState = {
@@ -348,11 +365,13 @@ const WeatherPage = ({ locationName }) => {
                 // Save this as the last viewed weather location!
                 localStorage.setItem('roamiq-last-viewed-weather-location', JSON.stringify({ lat, lon, city }));
 
-                // Cache for instant page returns!
-                localStorage.setItem('roamiq-cached-current-weather', JSON.stringify(weatherState));
-                localStorage.setItem('roamiq-cached-hourly-data', JSON.stringify(data.hourly));
-                localStorage.setItem('roamiq-cached-daily-data', JSON.stringify(data.daily));
-                localStorage.setItem('roamiq-weather-cache-time', Date.now().toString());
+                // Cache for today only
+                if (isSelectedDateToday) {
+                    localStorage.setItem('roamiq-cached-current-weather', JSON.stringify(weatherState));
+                    localStorage.setItem('roamiq-cached-hourly-data', JSON.stringify(data.hourly));
+                    localStorage.setItem('roamiq-cached-daily-data', JSON.stringify(data.daily));
+                    localStorage.setItem('roamiq-weather-cache-time', Date.now().toString());
+                }
 
                 setHourlyData(data.hourly);
                 setDailyData(data.daily);
@@ -366,6 +385,20 @@ const WeatherPage = ({ locationName }) => {
                 localStorage.setItem('roamiq-cached-inputs', JSON.stringify(newInputs));
 
                 handlePredictManual(weatherState.temperature, weatherState.humidity, 0, weatherState.wind_speed);
+
+                // Add to search history in backend
+                try {
+                    await axios.post('/api/travel/history', {
+                        place_name: city,
+                        latitude: Number(lat),
+                        longitude: Number(lon),
+                        display_name: city
+                    });
+                    fetchSearchHistory();
+                } catch (historyErr) {
+                    console.warn("Failed to save to search history", historyErr);
+                }
+
             } catch (err) {
                 console.error("Fetch Error:", err);
             } finally {
@@ -373,9 +406,7 @@ const WeatherPage = ({ locationName }) => {
             }
         };
         fetchWeather();
-    }, [routeLocation.search, handlePredictManual, locationName, navigate]);
-
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    }, [routeLocation.search, handlePredictManual, locationName, navigate, selectedDate, fetchSearchHistory]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -451,6 +482,46 @@ const WeatherPage = ({ locationName }) => {
         }
     };
 
+    const handleDeleteHistoryItem = async (historyId) => {
+        try {
+            await axios.delete(`/api/travel/history/${historyId}`);
+            fetchSearchHistory();
+        } catch (e) {
+            console.error("Failed to delete history item", e);
+        }
+    };
+
+    const handleClearHistory = async () => {
+        try {
+            await axios.delete('/api/travel/history');
+            setSearchHistory([]);
+        } catch (e) {
+            console.error("Failed to clear search history", e);
+        }
+    };
+
+    const getFilteredHourlyData = () => {
+        if (!hourlyData || !hourlyData.time) return null;
+        const indices = [];
+        hourlyData.time.forEach((t, idx) => {
+            if (t.startsWith(selectedDate)) {
+                indices.push(idx);
+            }
+        });
+        
+        if (indices.length > 0) {
+            return {
+                time: indices.map(idx => hourlyData.time[idx]),
+                temperature_2m: indices.map(idx => hourlyData.temperature_2m[idx]),
+                rain: hourlyData.rain ? indices.map(idx => hourlyData.rain[idx]) : new Array(indices.length).fill(0),
+                relative_humidity_2m: hourlyData.relative_humidity_2m ? indices.map(idx => hourlyData.relative_humidity_2m[idx]) : undefined,
+                weather_code: hourlyData.weather_code ? indices.map(idx => hourlyData.weather_code[idx]) : undefined,
+                is_day: hourlyData.is_day ? indices.map(idx => hourlyData.is_day[idx]) : undefined
+            };
+        }
+        return hourlyData;
+    };
+
     return (
         <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: 'var(--bg-gradient-main)', color: 'var(--text-main-weather)', fontFamily: "'Outfit', sans-serif" }}>
             <Sidebar 
@@ -462,6 +533,9 @@ const WeatherPage = ({ locationName }) => {
                 onToggleTheme={toggleTheme}
                 onRecheckLocation={handleRecheckLocation}
                 onBackToCurrent={handleBackToCurrent}
+                searchHistory={searchHistory}
+                onDeleteHistoryItem={handleDeleteHistoryItem}
+                onClearHistory={handleClearHistory}
             />
             
             <div className="weather-main-content" style={{ flex: 1, marginLeft: '240px', padding: '0' }}>
@@ -753,7 +827,7 @@ const WeatherPage = ({ locationName }) => {
                                                WebkitBackdropFilter: 'blur(16px)',
                                                border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(255, 255, 255, 0.25)' 
                                            }}>
-                                              <HourlyForecast data={hourlyData} themeColor={isDarkMode ? '#cbd5e1' : cardTheme.textColor} currentWeather={currentWeather} />
+                                              <HourlyForecast data={getFilteredHourlyData()} themeColor={isDarkMode ? '#cbd5e1' : cardTheme.textColor} currentWeather={currentWeather} />
                                           </div>
                                       </div>
                                   );

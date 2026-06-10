@@ -35,7 +35,7 @@ export const ThemeProvider = ({ children }) => {
             document.documentElement.style.setProperty('--accent-weather', '#ff7a00');
         } else {
             document.body.classList.remove('theme-dark-blue');
-            document.documentElement.style.setProperty('--bg-main', '#fff8f0');
+            document.documentElement.style.setProperty('--bg-main', '#f8fafc');
             document.documentElement.style.setProperty('--bg-card', '#ffffff');
             document.documentElement.style.setProperty('--text-main', '#0f172a');
             document.documentElement.style.setProperty('--text-muted', '#475569');
@@ -43,7 +43,7 @@ export const ThemeProvider = ({ children }) => {
             document.documentElement.style.setProperty('--glass-border', 'rgba(255, 107, 0, 0.15)');
             
             // For weather module compatibility
-            document.documentElement.style.setProperty('--bg-gradient-main', '#fff8f0');
+            document.documentElement.style.setProperty('--bg-gradient-main', '#f8fafc');
             document.documentElement.style.setProperty('--text-main-weather', '#0f172a');
             document.documentElement.style.setProperty('--glass-bg-weather', 'linear-gradient(135deg, rgba(241, 245, 249, 0.8) 0%, rgba(229, 237, 245, 0.8) 100%)');
             document.documentElement.style.setProperty('--glass-border-weather', 'rgba(148, 163, 184, 0.25)');

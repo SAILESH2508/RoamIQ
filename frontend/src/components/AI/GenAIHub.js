@@ -45,6 +45,74 @@ const parseItinerary = (content) => {
     return null;
 };
 
+const extractActivitiesAndTitle = (dayData, idx) => {
+    if (!dayData) return { title: `Day ${idx + 1}`, activities: [], dayNum: idx + 1 };
+    
+    if (typeof dayData === 'string') {
+        return {
+            title: dayData,
+            activities: [dayData],
+            dayNum: idx + 1
+        };
+    }
+    
+    if (Array.isArray(dayData)) {
+        return {
+            title: `Day ${idx + 1}`,
+            activities: dayData,
+            dayNum: idx + 1
+        };
+    }
+    
+    let dayNum = dayData.day || dayData.day_number || dayData.dayNumber || (idx + 1);
+    let title = dayData.title || dayData.theme || `Day ${dayNum}`;
+    let activities = [];
+    
+    const standardActivities = dayData.activities || dayData.plan || dayData.schedule || dayData.events;
+    if (standardActivities) {
+        if (Array.isArray(standardActivities)) {
+            activities = standardActivities;
+        } else if (typeof standardActivities === 'object' && standardActivities !== null) {
+            activities = Object.entries(standardActivities).map(([time, act]) => {
+                if (typeof act === 'object' && act !== null) {
+                    return { time: act.time || time, ...act };
+                }
+                return { time, activity: act };
+            });
+        } else {
+            activities = [standardActivities];
+        }
+    } else {
+        const keys = Object.keys(dayData).filter(k => k !== 'day' && k !== 'day_number' && k !== 'dayNumber' && k !== 'title' && k !== 'theme' && k !== 'date' && k !== 'estimated_cost');
+        
+        if (keys.length > 0) {
+            const dayKey = keys.find(k => k.toLowerCase().includes('day')) || keys[0];
+            const val = dayData[dayKey];
+            
+            const match = dayKey.match(/day[_\s]*(\d+)/i);
+            if (match) {
+                dayNum = parseInt(match[1], 10);
+                title = dayData.title || dayData.theme || `Day ${dayNum}`;
+            }
+            
+            if (Array.isArray(val)) {
+                activities = val;
+            } else if (typeof val === 'object' && val !== null) {
+                activities = Object.entries(val).map(([time, act]) => {
+                    if (typeof act === 'object' && act !== null) {
+                        return { time: act.time || time, ...act };
+                    }
+                    return { time, activity: act };
+                });
+            } else if (val) {
+                activities = [val];
+            }
+        }
+    }
+    
+    return { title, activities, dayNum };
+};
+
 const GenAIHub = () => {
     const { currentCurrency, formatCurrency } = useCurrency();
     const { trips, fetchTrips, refreshData } = useData();
@@ -779,68 +847,93 @@ const GenAIHub = () => {
                                                                 </div>
                                                             </div>
                                                         </div>
-
-                                                        {/* Days Timeline */}
+                                                                           {/* Days Timeline */}
                                                         <div className="d-flex flex-column gap-3 mb-3">
-                                                            {(itinerary.days || itinerary.itinerary || []).map((dayData, idx) => (
-                                                                <div key={idx} className="p-3 rounded-4 shadow-sm border" style={{
-                                                                    background: isDarkMode ? 'rgba(30, 41, 59, 0.35)' : 'rgba(255, 255, 255, 0.75)',
-                                                                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-                                                                    borderRadius: '1rem'
-                                                                }}>
-                                                                    <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style={{ borderColor: 'rgba(0, 0, 0, 0.05)' }}>
-                                                                        <div className="d-flex align-items-center gap-2">
-                                                                            <span className="badge bg-primary rounded-pill bg-primary-gradient border-0 px-2 py-1 small fw-black" style={{ fontSize: '0.7rem' }}>
-                                                                                Day {dayData.day}
-                                                                            </span>
-                                                                            {dayData.date && (
-                                                                                <span className="small text-muted fw-bold" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                                                    📅 {new Date(dayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            {(itinerary.days || itinerary.itinerary || []).map((dayData, idx) => {
+                                                                const { title: dayTitle, activities: rawActivities, dayNum } = extractActivitiesAndTitle(dayData, idx);
+                                                                const isDayStr = typeof dayData === 'string';                                            
+                                                                
+                                                                return (
+                                                                    <div key={idx} className="p-3 rounded-4 shadow-sm border" style={{
+                                                                        background: isDarkMode ? 'rgba(30, 41, 59, 0.35)' : 'rgba(255, 255, 255, 0.75)',
+                                                                        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                                                                        borderRadius: '1rem'
+                                                                    }}>
+                                                                        <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style={{ borderColor: 'rgba(0, 0, 0, 0.05)' }}>
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                <span className="badge bg-primary rounded-pill bg-primary-gradient border-0 px-2 py-1 small fw-black" style={{ fontSize: '0.7rem' }}>
+                                                                                    Day {dayNum}
                                                                                 </span>
-                                                                            )}
-                                                                        </div>
-                                                                        {dayData.estimated_cost && (
-                                                                            <div className="small fw-black text-primary" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
-                                                                                Daily Est: {formatCurrency(
-                                                                                    Object.values(dayData.estimated_cost).reduce((a, b) => a + b, 0),
-                                                                                    currentCurrency,
-                                                                                    currentCurrency
+                                                                                {dayTitle && dayTitle !== `Day ${dayNum}` && (
+                                                                                    <span className="small text-muted fw-bold text-truncate" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '200px' }}>
+                                                                                        {dayTitle}
+                                                                                    </span>
+                                                                                )}
+                                                                                {!isDayStr && dayData.date && (
+                                                                                    <span className="small text-muted fw-bold" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                                                        📅 {new Date(dayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                                    </span>
                                                                                 )}
                                                                             </div>
-                                                                        )}
-                                                                    </div>
+                                                                            {!isDayStr && dayData.estimated_cost && (
+                                                                                <div className="small fw-black text-primary" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>
+                                                                                    Daily Est: {formatCurrency(
+                                                                                        Object.values(dayData.estimated_cost).reduce((a, b) => a + b, 0),
+                                                                                        currentCurrency,
+                                                                                        currentCurrency
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
 
-                                                                    {/* Activities List */}
-                                                                    <div className="d-flex flex-column gap-2 mb-3">
-                                                                        {(dayData.activities || []).map((act, actIdx) => (
-                                                                            <div key={actIdx} className="d-flex gap-3 align-items-start px-1">
-                                                                                <span className="mt-1" style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>🔸</span>
-                                                                                <span className="small fw-bold" style={{ color: 'var(--text-main)', lineHeight: '1.4' }}>{act}</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-
-                                                                    {/* Cost Category Breakdown Badges */}
-                                                                    {dayData.estimated_cost && (
-                                                                        <div className="d-flex flex-wrap gap-2 pt-2 border-top" style={{ borderColor: 'rgba(0, 0, 0, 0.02)' }}>
-                                                                            {Object.entries(dayData.estimated_cost).map(([cat, val]) => {
-                                                                                if (val === 0) return null;
-                                                                                let icon = '💸';
-                                                                                if (cat.toLowerCase().includes('transport')) icon = '🚗';
-                                                                                if (cat.toLowerCase().includes('accommodation') || cat.toLowerCase().includes('hotel') || cat.toLowerCase().includes('lodging')) icon = '🏨';
-                                                                                if (cat.toLowerCase().includes('food') || cat.toLowerCase().includes('meal')) icon = '🍔';
-                                                                                if (cat.toLowerCase().includes('activities') || cat.toLowerCase().includes('ticket')) icon = '🎟️';
+                                                                        {/* Activities List */}
+                                                                        <div className="d-flex flex-column gap-2 mb-3">
+                                                                            {rawActivities.map((act, actIdx) => {
+                                                                                const isActObj = act && typeof act === 'object';
+                                                                                const actTitle = isActObj ? (act.activity || act.title || '') : act;
+                                                                                const actDesc = isActObj ? act.description : '';
+                                                                                const actTime = isActObj ? act.time : '';
+                                                                                
+                                                                                const textToRender = actTime ? `[${actTime}] ${actTitle}` : actTitle;
                                                                                 
                                                                                 return (
-                                                                                    <span key={cat} className="badge bg-secondary bg-opacity-10 text-muted px-2 py-1 rounded-pill small fw-bold text-uppercase" style={{ fontSize: '0.65rem', border: '1px solid rgba(0, 0, 0, 0.05)', color: 'var(--text-main)' }}>
-                                                                                        {icon} {cat}: {formatCurrency(val, currentCurrency, currentCurrency)}
-                                                                                    </span>
+                                                                                    <div key={actIdx} className="d-flex flex-column gap-1 px-1">
+                                                                                        <div className="d-flex gap-3 align-items-start">
+                                                                                            <span className="mt-1" style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>🔸</span>
+                                                                                            <span className="small fw-bold" style={{ color: 'var(--text-main)', lineHeight: '1.4' }}>{textToRender}</span>
+                                                                                        </div>
+                                                                                        {actDesc && (
+                                                                                            <div className="small text-muted ps-4" style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)', opacity: 0.8 }}>
+                                                                                                {actDesc}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 );
                                                                             })}
                                                                         </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+
+                                                                        {/* Cost Category Breakdown Badges */}
+                                                                        {!isDayStr && dayData.estimated_cost && (
+                                                                            <div className="d-flex flex-wrap gap-2 pt-2 border-top" style={{ borderColor: 'rgba(0, 0, 0, 0.02)' }}>
+                                                                                {Object.entries(dayData.estimated_cost).map(([cat, val]) => {
+                                                                                    if (val === 0) return null;
+                                                                                    let icon = '💸';
+                                                                                    if (cat.toLowerCase().includes('transport')) icon = '🚗';
+                                                                                    if (cat.toLowerCase().includes('accommodation') || cat.toLowerCase().includes('hotel') || cat.toLowerCase().includes('lodging')) icon = '🏨';
+                                                                                    if (cat.toLowerCase().includes('food') || cat.toLowerCase().includes('meal')) icon = '🍔';
+                                                                                    if (cat.toLowerCase().includes('activities') || cat.toLowerCase().includes('ticket')) icon = '🎟️';
+                                                                                    
+                                                                                    return (
+                                                                                        <span key={cat} className="badge bg-secondary bg-opacity-10 text-muted px-2 py-1 rounded-pill small fw-bold text-uppercase" style={{ fontSize: '0.65rem', border: '1px solid rgba(0, 0, 0, 0.05)', color: 'var(--text-main)' }}>
+                                                                                            {icon} {cat}: {formatCurrency(val, currentCurrency, currentCurrency)}
+                                                                                        </span>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
 

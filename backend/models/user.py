@@ -6,6 +6,7 @@ from backend.models.ticket import Ticket
 from backend.models.chat_message import ChatMessage
 from backend.models.preference import UserPreference
 from backend.models.trip import Trip
+from backend.models.search_history import SearchHistory
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -27,6 +28,7 @@ class User(db.Model):
     trips = db.relationship('Trip', backref='user', lazy=True, cascade='all, delete-orphan')
     tickets = db.relationship('Ticket', backref='user', lazy=True, cascade='all, delete-orphan')
     chat_messages = db.relationship('ChatMessage', backref='user', lazy=True, cascade='all, delete-orphan')
+    search_history = db.relationship('SearchHistory', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Hash and set password"""

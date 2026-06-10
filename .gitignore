@@ -31,8 +31,8 @@ ENV/
 # Flask
 instance/
 .webassets-cache
-backend_debug.log
-backend_error.log
+backend_debug.log*
+backend_error.log*
 
 # Database
 *.db

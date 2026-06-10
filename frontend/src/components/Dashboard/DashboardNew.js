@@ -189,12 +189,10 @@ const DashboardNew = () => {
                   <div className="d-flex align-items-center gap-2 rounded-4 shadow-sm overflow-hidden" style={{ background: 'var(--glass-bg-weather)', border: '1px solid var(--glass-border-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                       <LocationTracker onUpdate={(loc) => {
                           const name = loc.address?.split(',')[0] || 'Unknown Location';
-                          setUserCurrentLocation({
+                          setUserLocation({
                               lat: loc.lat,
                               lng: loc.lng,
-                              name: name,
-                              country: '',
-                              fullAddress: loc.address
+                              address: loc.address
                           });
                           fetchWeatherForLocation(loc.lat, loc.lng, name);
                       }} />

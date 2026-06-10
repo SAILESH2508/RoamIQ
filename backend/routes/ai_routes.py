@@ -27,7 +27,7 @@ def get_available_models():
         models = llm_provider.get_available_models()
         return jsonify({
             'models': models,
-            'default_model': 'gemini-1.5-flash',
+            'default_model': os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash'),
             'total_models': len(models)
         })
     except Exception as e:
@@ -45,7 +45,7 @@ async def chat_with_ai():
         
         message = data['message']
         import os
-        model = data.get('model', os.getenv('DEFAULT_LLM_MODEL', 'gemini-1.5-flash'))
+        model = data.get('model', os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash'))
         conversation_id = data.get('conversation_id')
         currency = data.get('currency', 'USD')
         save_to_history = data.get('save_to_history', True)

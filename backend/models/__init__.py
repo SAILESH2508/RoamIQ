@@ -6,5 +6,6 @@ from backend.models.chat_message import ChatMessage
 from backend.models.mood_log import MoodLog
 from backend.models.packing_list import PackingItem
 from backend.models.expense import Expense
+from backend.models.search_history import SearchHistory
 
-__all__ = ['User', 'UserPreference', 'Trip', 'Ticket', 'ChatMessage', 'MoodLog', 'PackingItem', 'Expense']
+__all__ = ['User', 'UserPreference', 'Trip', 'Ticket', 'ChatMessage', 'MoodLog', 'PackingItem', 'Expense', 'SearchHistory']

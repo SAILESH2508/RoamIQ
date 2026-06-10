@@ -128,7 +128,7 @@ const TicketManager = ({ tripId }) => {
                                                 <div className="fw-bold text-dark">{ticket.title}</div>
                                                 <div className="small text-muted">{ticket.description}</div>
                                                 {ticket.valid_from && (
-                                                    <Badge className="bg-primary-light bg-opacity-10 text-primary border-0 rounded-pill px-2 mt-1 fw-bold x-small">
+                                                    <Badge className="bg-primary-soft text-primary border-0 rounded-pill px-2 mt-1 fw-bold x-small">
                                                         {new Date(ticket.valid_from).toLocaleDateString()}
                                                     </Badge>
                                                 )}

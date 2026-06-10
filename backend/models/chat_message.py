@@ -11,6 +11,14 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     
+    def __init__(self, conversation_id=None, user_id=None, role=None, content=None, timestamp=None):
+        self.conversation_id = conversation_id
+        self.user_id = user_id
+        self.role = role
+        self.content = content
+        if timestamp is not None:
+            self.timestamp = timestamp
+    
     def to_dict(self):
         return {
             'id': self.id,

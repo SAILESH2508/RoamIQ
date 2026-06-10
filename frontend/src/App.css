@@ -215,7 +215,7 @@
 }
 
 .navbar-premium.scrolled {
-  background: #fff8f0 !important; /* Matches bg-main for seamless scroll */
+  background: var(--bg-main) !important; /* Matches bg-main for seamless scroll */
   box-shadow: 0 4px 20px rgba(255, 107, 0, 0.1);
 }
 

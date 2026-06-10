@@ -76,6 +76,8 @@ class LLMProvider:
             'gemini-1.5-pro': ModelConfig(ModelProvider.GOOGLE, 'gemini-1.5-pro', max_tokens=8192, cost_per_1k_tokens=0.001),
             'gemini-2.0-flash': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.0-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
             'gemini-2.0-flash-v2': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.0-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
+            'gemini-2.5-flash': ModelConfig(ModelProvider.GOOGLE, 'gemini-2.5-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
+            'gemini-3.5-flash': ModelConfig(ModelProvider.GOOGLE, 'gemini-3.5-flash', max_tokens=8192, cost_per_1k_tokens=0.0005),
             'claude-3-5-sonnet': ModelConfig(ModelProvider.ANTHROPIC, 'claude-3-5-sonnet-20240620', max_tokens=8192, cost_per_1k_tokens=0.015),
             'command-r-plus': ModelConfig(ModelProvider.COHERE, 'command-r-plus-08-2024', max_tokens=4000, cost_per_1k_tokens=0.0005),
             'offline-mock': ModelConfig(ModelProvider.MOCK, 'offline-mock', max_tokens=2000)
@@ -167,9 +169,9 @@ class LLMProvider:
     ) -> Union[str, Dict[str, Any]]:
         # Backend-only choice for the "best" available model
         if model_name is None:
-            model_name = os.getenv('DEFAULT_LLM_MODEL', 'gemini-1.5-flash')
+            model_name = os.getenv('DEFAULT_LLM_MODEL', 'gemini-3.5-flash')
             if model_name not in self.models:
-                model_name = 'gemini-2.0-flash'
+                model_name = 'gemini-2.5-flash'
             
         if tried_models is None:
             tried_models = []
@@ -259,7 +261,7 @@ class LLMProvider:
                 return f"AI system failure. All fallbacks exhausted. Final error: {e}"
 
     def _select_best_fallback(self, tried_models: List[str]) -> Optional[str]:
-        chain = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gpt-4o-mini', 'command-r-plus', 'offline-mock']
+        chain = ['gemini-3.5-flash', 'gemini-2.5-flash', 'command-r-plus', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gpt-4o-mini', 'offline-mock']
         for model in chain:
             if model not in tried_models:
                 p = self._get_provider_for_model(model)

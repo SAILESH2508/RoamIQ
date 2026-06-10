@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
 
-const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDarkMode, onToggleTheme, onRecheckLocation, onBackToCurrent }) => {
+const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDarkMode, onToggleTheme, onRecheckLocation, onBackToCurrent, searchHistory = [], onDeleteHistoryItem, onClearHistory }) => {
     const navigate = useNavigate();
     const debounceTimeoutRef = useRef(null);
 
@@ -207,12 +207,60 @@ const Sidebar = ({ selectedDate, onDateChange, weatherData, isLoadingData, isDar
                     </div>
                 </div>
 
-                <div className="input-group rounded-4 border-0 overflow-hidden shadow-sm" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+                <div className="input-group rounded-4 border-0 overflow-hidden shadow-sm mb-3" style={{ background: 'var(--glass-bg-weather)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
                     <span className="input-group-text bg-transparent border-0 pe-0">
                         <span className="opacity-50">🔍</span>
                     </span>
                     <input type="text" className="form-control bg-transparent border-0 py-2" placeholder="Search City..." value={searchQuery} onChange={handleSearch} style={{ fontSize: '0.85rem', boxShadow: 'none', fontWeight: '600', color: 'var(--text-main-weather)' }} />
                 </div>
+
+                {searchHistory && searchHistory.length > 0 && (
+                    <div className="recent-searches-container mt-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2 px-1">
+                            <span className="x-small fw-black text-muted text-uppercase" style={{ letterSpacing: '1px', fontSize: '0.65rem', color: 'var(--text-main-weather)', opacity: 0.7 }}>🕒 Recent Searches</span>
+                            <button 
+                                className="btn btn-link p-0 text-muted x-small fw-bold text-decoration-none" 
+                                style={{ fontSize: '0.65rem', color: 'var(--text-main-weather)', opacity: 0.6 }} 
+                                onClick={onClearHistory}
+                            >
+                                Clear All
+                            </button>
+                        </div>
+                        <div className="d-flex flex-column gap-1.5 custom-scrollbar" style={{ maxHeight: '130px', overflowY: 'auto' }}>
+                            {searchHistory.map((item) => (
+                                <div 
+                                    key={item.id} 
+                                    className="d-flex justify-content-between align-items-center py-1.5 px-3 rounded-4 transition-all hover-lift shadow-sm mb-1"
+                                    style={{ 
+                                        background: 'var(--glass-bg-weather)', 
+                                        border: '1px solid var(--glass-border-weather)', 
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        color: 'var(--text-main-weather)'
+                                    }}
+                                >
+                                    <span 
+                                        className="cursor-pointer text-truncate flex-grow-1 text-start" 
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => handleCitySelect({ name: item.place_name, latitude: item.latitude, longitude: item.longitude })}
+                                    >
+                                        📍 {item.place_name}
+                                    </span>
+                                    <button 
+                                        className="btn btn-link p-0 text-muted ms-2 border-0 hover-lift" 
+                                        style={{ fontSize: '0.8rem', color: 'var(--text-main-weather)', textDecoration: 'none' }} 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDeleteHistoryItem && onDeleteHistoryItem(item.id);
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="mb-4">

@@ -11,6 +11,74 @@ import {
     FaMapMarkerAlt
 } from 'react-icons/fa';
 
+const extractActivitiesAndTitle = (dayData, idx) => {
+    if (!dayData) return { title: `Day ${idx + 1}`, activities: [], dayNum: idx + 1 };
+    
+    if (typeof dayData === 'string') {
+        return {
+            title: dayData,
+            activities: [dayData],
+            dayNum: idx + 1
+        };
+    }
+    
+    if (Array.isArray(dayData)) {
+        return {
+            title: `Day ${idx + 1}`,
+            activities: dayData,
+            dayNum: idx + 1
+        };
+    }
+    
+    let dayNum = dayData.day || dayData.day_number || dayData.dayNumber || (idx + 1);
+    let title = dayData.title || dayData.theme || `Day ${dayNum}`;
+    let activities = [];
+    
+    const standardActivities = dayData.activities || dayData.plan || dayData.schedule || dayData.events;
+    if (standardActivities) {
+        if (Array.isArray(standardActivities)) {
+            activities = standardActivities;
+        } else if (typeof standardActivities === 'object' && standardActivities !== null) {
+            activities = Object.entries(standardActivities).map(([time, act]) => {
+                if (typeof act === 'object' && act !== null) {
+                    return { time: act.time || time, ...act };
+                }
+                return { time, activity: act };
+            });
+        } else {
+            activities = [standardActivities];
+        }
+    } else {
+        const keys = Object.keys(dayData).filter(k => k !== 'day' && k !== 'day_number' && k !== 'dayNumber' && k !== 'title' && k !== 'theme' && k !== 'date' && k !== 'estimated_cost');
+        
+        if (keys.length > 0) {
+            const dayKey = keys.find(k => k.toLowerCase().includes('day')) || keys[0];
+            const val = dayData[dayKey];
+            
+            const match = dayKey.match(/day[_\s]*(\d+)/i);
+            if (match) {
+                dayNum = parseInt(match[1], 10);
+                title = dayData.title || dayData.theme || `Day ${dayNum}`;
+            }
+            
+            if (Array.isArray(val)) {
+                activities = val;
+            } else if (typeof val === 'object' && val !== null) {
+                activities = Object.entries(val).map(([time, act]) => {
+                    if (typeof act === 'object' && act !== null) {
+                        return { time: act.time || time, ...act };
+                    }
+                    return { time, activity: act };
+                });
+            } else if (val) {
+                activities = [val];
+            }
+        }
+    }
+    
+    return { title, activities, dayNum };
+};
+
 const ItineraryView = ({ itinerary }) => {
     const { formatCurrency } = useCurrency();
 
@@ -74,57 +142,72 @@ const ItineraryView = ({ itinerary }) => {
                     style={{ left: '0px', width: '4px', top: '20px', background: 'linear-gradient(to bottom, var(--primary) 0%, transparent 100%)', opacity: 0.2 }}
                 ></div>
 
-                {itinerary.days.map((day, index) => (
-                    <div key={index} className="mb-5 position-relative ps-4">
-                        {/* Day Dot */}
-                        <div
-                            className="position-absolute bg-primary-gradient rounded-circle border border-white border-3 shadow-md d-flex align-items-center justify-content-center fw-black text-white small animate-pop-up"
-                            style={{ width: '36px', height: '36px', left: '-16px', top: '-4px', fontSize: '0.9rem' }}
-                        >
-                            {day.day}
-                        </div>
+                {itinerary.days.map((dayData, index) => {
+                    const { title: dayTitle, activities: rawActivities, dayNum } = extractActivitiesAndTitle(dayData, index);
+                    
+                    return (
+                        <div key={index} className="mb-5 position-relative ps-4">
+                            {/* Day Dot */}
+                            <div
+                                className="position-absolute bg-primary-gradient rounded-circle border border-white border-3 shadow-md d-flex align-items-center justify-content-center fw-black text-white small animate-pop-up"
+                                style={{ width: '36px', height: '36px', left: '-16px', top: '-4px', fontSize: '0.9rem' }}
+                            >
+                                {dayNum}
+                            </div>
 
-                        <h5 className="d-flex align-items-center gap-3 mb-4 mt-0">
-                            <span className="fw-black text-dark fs-4">Day {day.day}</span>
-                            <span className="text-muted opacity-25">/</span>
-                            <span className="text-primary fw-black text-uppercase small" style={{ letterSpacing: '2px' }}>{day.title}</span>
-                        </h5>
+                            <h5 className="d-flex align-items-center gap-3 mb-4 mt-0">
+                                <span className="fw-black text-dark fs-4">Day {dayNum}</span>
+                                <span className="text-muted opacity-25">/</span>
+                                <span className="text-primary fw-black text-uppercase small" style={{ letterSpacing: '2px' }}>{dayTitle}</span>
+                            </h5>
 
-                        <div className="d-flex flex-column gap-3">
-                            {day.activities?.map((activity, actIndex) => (
-                                <Card key={actIndex} className="border-0 shadow-sm hover-lift transition-all bg-white overflow-hidden" style={{ borderRadius: '20px' }}>
-                                    <Card.Body className="p-4">
-                                        <div className="d-flex align-items-start">
-                                            <div className="me-4 mt-1">
-                                                <div className="rounded-circle bg-primary-light bg-opacity-10 p-3 d-flex justify-content-center align-items-center" style={{ width: '50px', height: '50px' }}>
-                                                    {getActivityIcon(activity.type)}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-grow-1">
-                                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                                    <h6 className="fw-bold fs-5 mb-0 text-dark">{activity.activity}</h6>
-                                                    <Badge bg="light" text="dark" className="fw-bold border rounded-pill px-3 py-1 small">
-                                                        {activity.time}
-                                                    </Badge>
-                                                </div>
-                                                <p className="text-secondary mb-3 fw-medium">{activity.description}</p>
-
-                                                {activity.estimated_cost > 0 && (
-                                                    <div className="text-start">
-                                                        <span className="badge bg-primary-light bg-opacity-10 text-primary px-3 py-2 rounded-pill small fw-bold">
-                                                            <FaMoneyBillWave className="me-2" /> Est. {formatCurrency(activity.estimated_cost)}
-                                                        </span>
+                            <div className="d-flex flex-column gap-3">
+                                {rawActivities?.map((activity, actIndex) => {
+                                const isObj = activity && typeof activity === 'object';
+                                const activityTitle = isObj ? (activity.activity || '') : activity;
+                                const activityDesc = isObj ? activity.description : '';
+                                const activityTime = isObj ? activity.time : '';
+                                const activityType = isObj ? activity.type : '';
+                                const activityCost = isObj ? activity.estimated_cost : 0;
+                                
+                                return (
+                                    <Card key={actIndex} className="border-0 shadow-sm hover-lift transition-all bg-white overflow-hidden" style={{ borderRadius: '20px' }}>
+                                        <Card.Body className="p-4">
+                                            <div className="d-flex align-items-start">
+                                                <div className="me-4 mt-1">
+                                                    <div className="rounded-circle bg-primary-soft p-3 d-flex justify-content-center align-items-center" style={{ width: '50px', height: '50px' }}>
+                                                        {getActivityIcon(activityType)}
                                                     </div>
-                                                )}
+                                                </div>
+
+                                                <div className="flex-grow-1">
+                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                        <h6 className="fw-bold fs-5 mb-0 text-dark">{activityTitle}</h6>
+                                                        {activityTime && (
+                                                            <Badge bg="light" text="dark" className="fw-bold border rounded-pill px-3 py-1 small">
+                                                                {activityTime}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {activityDesc && <p className="text-secondary mb-3 fw-medium">{activityDesc}</p>}
+
+                                                    {activityCost > 0 && (
+                                                        <div className="text-start">
+                                                            <span className="badge bg-primary-soft text-primary px-3 py-2 rounded-pill small fw-bold">
+                                                                <FaMoneyBillWave className="me-2" /> Est. {formatCurrency(activityCost)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            ))}
+                                        </Card.Body>
+                                    </Card>
+                                 );
+                             })}
                         </div>
                     </div>
-                ))}
+                );
+            })}
             </div>
 
             <style>{`
