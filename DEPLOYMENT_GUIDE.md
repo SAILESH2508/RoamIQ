@@ -31,20 +31,36 @@ npm install --legacy-peer-deps
 npm start
 ```
 
-## 🌐 Self-Hosting Options
+## 🌐 Cloud Deployment (Vercel + Render)
 
-You can deploy this application on any cloud provider that supports:
-- Python Flask applications
-- React static files
-- PostgreSQL/SQLite databases
+This codebase contains built-in configurations to support seamless deployment using **Vercel** (for the React Frontend) and **Render** (for the Flask Backend + PostgreSQL Database).
 
-Popular options include:
-- DigitalOcean
-- AWS
-- Google Cloud
-- Azure
-- Railway
-- Heroku
+### 1. Backend Deployment (Render)
+
+We have provided a Render Blueprint spec in `render.yaml` at the root of the project to automatically configure your Flask backend and a PostgreSQL database.
+
+1. Create a [Render](https://render.com/) account.
+2. Click **New +** and select **Blueprint**.
+3. Connect your GitHub/GitLab repository.
+4. Render will automatically detect `render.yaml` and prompt you to create the services:
+   - A PostgreSQL database (`roamiq-db`) will be provisioned.
+   - A Web Service (`roamiq-backend`) running with Gunicorn will be created.
+5. In the dashboard, configure the `GOOGLE_API_KEY` environment variable on the web service with your actual Google Gemini API Key.
+6. Once deployed, note down the URL of your backend service (e.g., `https://roamiq-backend.onrender.com`).
+
+### 2. Frontend Deployment (Vercel)
+
+We have provided a `frontend/vercel.json` file to configure path rewrites, ensuring React Router SPA routing works smoothly without 404 errors on page reload.
+
+1. Create a [Vercel](https://vercel.com/) account.
+2. Click **Add New** -> **Project** and import your Git repository.
+3. In the configuration settings:
+   - Set the **Root Directory** to `frontend`.
+   - Set the **Build Command** to `npm run build`.
+   - Set the **Output Directory** to `build`.
+4. Under **Environment Variables**, add:
+   - `REACT_APP_API_URL`: Your deployed backend service URL (e.g., `https://roamiq-backend.onrender.com`).
+5. Click **Deploy**. Vercel will build and serve your static React application.
 
 ---
 

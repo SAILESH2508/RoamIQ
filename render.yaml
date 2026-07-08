@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: roamiq-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn backend.app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: roamiq-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_API_KEY
+        sync: false
+
+databases:
+  - name: roamiq-db
+    plan: free
